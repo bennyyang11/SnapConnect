@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View, ActivityIndicator, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
+import { Text, View, ActivityIndicator, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput, Platform } from 'react-native';
 import { useAppStore } from './src/store/useAppStore';
 import { RootStackParamList } from './src/types';
 import CameraScreen from './src/screens/main/CameraScreen';
@@ -12,6 +12,12 @@ import StoriesScreen from './src/screens/main/StoriesScreen';
 import ChatDetailScreen from './src/screens/main/ChatDetailScreen';
 import PhotoEditorScreen from './src/screens/main/PhotoEditorScreen';
 import ShareScreen from './src/screens/main/ShareScreen';
+import WorkoutSearchScreen from './src/screens/main/WorkoutSearchScreen';
+import FitnessScreen from './src/screens/fitness/FitnessScreen';
+import FitnessChatScreen from './src/screens/fitness/ChatScreen';
+import DiscoverScreen from './src/screens/main/DiscoverScreen';
+import FriendshipMemoryScreen from './src/screens/main/FriendshipMemoryScreen';
+import SettingsScreen from './src/screens/main/SettingsScreen';
 
 // Real navigation components
 import AuthNavigator from './src/navigation/AuthNavigator';
@@ -37,138 +43,11 @@ const ChatStackNavigator = () => (
   </ChatStack.Navigator>
 );
 
-const DemoDiscoverScreen = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // Mock discover content
-  const mockContent = [
-    {
-      id: '1',
-      title: 'Top 10 Workout Tips',
-      category: 'Fitness',
-      creator: 'FitGuru',
-      emoji: '💪',
-      views: '1.2M',
-    },
-    {
-      id: '2',
-      title: 'Healthy Recipe Ideas',
-      category: 'Food',
-      creator: 'ChefMaster',
-      emoji: '🥗',
-      views: '850K',
-    },
-    {
-      id: '3',
-      title: 'Travel Photography',
-      category: 'Travel',
-      creator: 'Wanderlust',
-      emoji: '📸',
-      views: '2.1M',
-    },
-    {
-      id: '4',
-      title: 'Tech News Daily',
-      category: 'Technology',
-      creator: 'TechReporter',
-      emoji: '📱',
-      views: '500K',
-    },
-    {
-      id: '5',
-      title: 'Morning Meditation',
-      category: 'Wellness',
-      creator: 'ZenMaster',
-      emoji: '🧘',
-      views: '650K',
-    },
-    {
-      id: '6',
-      title: 'DIY Home Projects',
-      category: 'Lifestyle',
-      creator: 'HomeCrafter',
-      emoji: '🏠',
-      views: '920K',
-    },
-  ];
-
-  // Filter content based on search query
-  const filteredContent = mockContent.filter(item =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.creator.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  return (
-    <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Discover</Text>
-      </View>
-      
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search content, creators, topics..."
-          placeholderTextColor="#9E9E9E"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        <Text style={styles.searchIcon}>🔍</Text>
-      </View>
-      
-      <ScrollView style={styles.content}>
-        {filteredContent.length > 0 ? (
-          filteredContent.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.contentCard}>
-              <View style={styles.contentLeft}>
-                <Text style={styles.contentEmoji}>{item.emoji}</Text>
-                <View style={styles.contentInfo}>
-                  <Text style={styles.contentTitle}>{item.title}</Text>
-                  <Text style={styles.contentCreator}>by {item.creator}</Text>
-                  <View style={styles.contentMeta}>
-                    <Text style={styles.contentCategory}>{item.category}</Text>
-                    <Text style={styles.contentViews}>{item.views} views</Text>
-                  </View>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.viewButton}>
-                <Text style={styles.viewButtonText}>View</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.noResults}>
-            <Text style={styles.noResultsText}>No content found</Text>
-            <Text style={styles.noResultsSubtext}>Try searching for something else</Text>
-          </View>
-        )}
-        
-        {searchQuery === '' && (
-          <View style={styles.suggestions}>
-            <Text style={styles.suggestionsTitle}>Popular Topics</Text>
-            <View style={styles.topicTags}>
-              {['Fitness', 'Food', 'Travel', 'Technology', 'Wellness', 'Lifestyle'].map((topic) => (
-                <TouchableOpacity 
-                  key={topic} 
-                  style={styles.topicTag}
-                  onPress={() => setSearchQuery(topic)}
-                >
-                  <Text style={styles.topicTagText}>{topic}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-      </ScrollView>
-    </View>
-  );
-};
+// DemoDiscoverScreen removed - now using AI-powered DiscoverScreen
 
 const DemoProfileScreen = () => {
-  const { user, setUser, setAuthenticated } = useAppStore();
+  const navigation = useNavigation<any>();
+  const { user, logoutSession } = useAppStore();
   
   const handleLogout = async () => {
     Alert.alert(
@@ -180,8 +59,8 @@ const DemoProfileScreen = () => {
           text: 'Sign Out', 
           style: 'destructive',
           onPress: () => {
-            setUser(null);
-            setAuthenticated(false);
+            // Use logoutSession to preserve data in storage
+            logoutSession();
           }
         }
       ]
@@ -192,15 +71,23 @@ const DemoProfileScreen = () => {
     <View style={styles.screen}>
       <View style={[styles.header, styles.profileHeader]}>
         <Text style={styles.title}>Profile</Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Log out</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            style={styles.settingsButton} 
+            onPress={() => navigation.navigate('Settings' as any)}
+          >
+            <Text style={styles.settingsButtonText}>⚙️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Log out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <ScrollView style={styles.content}>
         <View style={styles.profileInfo}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {user?.displayName?.charAt(0)?.toUpperCase() || '💪'}
+              {user?.avatarEmoji || user?.displayName?.charAt(0)?.toUpperCase() || '💪'}
             </Text>
           </View>
           <Text style={styles.displayName}>{user?.displayName || 'Snap User'}</Text>
@@ -230,13 +117,94 @@ const DemoProfileScreen = () => {
               <Text style={styles.verifiedText}>✓ Verified Account</Text>
             </View>
           )}
-          
-          <View style={styles.demoCard}>
-            <Text style={styles.cardTitle}>✅ Demo Mode Active</Text>
-            <Text style={styles.cardText}>• Chat with friends</Text>
-            <Text style={styles.cardText}>• Share stories</Text>
-            <Text style={styles.cardText}>• Send snaps</Text>
-            <Text style={styles.cardText}>• Discover content</Text>
+
+          {/* AI & Activity Stats */}
+          <View style={styles.aiStatsContainer}>
+            <View style={styles.aiStatCard}>
+              <Text style={styles.aiStatIcon}>🤖</Text>
+              <Text style={styles.aiStatNumber}>47</Text>
+              <Text style={styles.aiStatLabel}>AI Filters Used</Text>
+            </View>
+            <View style={styles.aiStatCard}>
+              <Text style={styles.aiStatIcon}>🎯</Text>
+              <Text style={styles.aiStatNumber}>12</Text>
+              <Text style={styles.aiStatLabel}>Friend Memories</Text>
+            </View>
+            <View style={styles.aiStatCard}>
+              <Text style={styles.aiStatIcon}>💪</Text>
+              <Text style={styles.aiStatNumber}>8</Text>
+              <Text style={styles.aiStatLabel}>Workouts Tracked</Text>
+            </View>
+          </View>
+
+          {/* Recent Activity */}
+          <View style={styles.activitySection}>
+            <Text style={styles.sectionTitle}>📊 Recent Activity</Text>
+            <View style={styles.activityItem}>
+              <Text style={styles.activityIcon}>🎨</Text>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityText}>Used Rainbow Sparkles AI filter</Text>
+                <Text style={styles.activityTime}>2 hours ago</Text>
+              </View>
+            </View>
+            
+            <View style={styles.activityItem}>
+              <Text style={styles.activityIcon}>👥</Text>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityText}>Sent snap to Alex</Text>
+                <Text style={styles.activitySubtext}>+1 Snap Score</Text>
+                <Text style={styles.activityTime}>5 hours ago</Text>
+              </View>
+            </View>
+            
+            <View style={styles.activityItem}>
+              <Text style={styles.activityIcon}>📖</Text>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityText}>Story: 3 views</Text>
+                <Text style={styles.activitySubtext}>+3 Snap Score</Text>
+                <Text style={styles.activityTime}>6 hours ago</Text>
+              </View>
+            </View>
+            
+            <View style={[styles.activityItem, styles.activityItemLast]}>
+              <Text style={styles.activityIcon}>🏋️</Text>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityText}>Logged chest workout to AI</Text>
+                <Text style={styles.activityTime}>1 day ago</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Streaks & Achievements */}
+          <View style={styles.achievementsSection}>
+            <Text style={styles.sectionTitle}>🔥 Streaks & Achievements</Text>
+            <View style={styles.streakContainer}>
+              <View style={styles.streakItem}>
+                <Text style={styles.streakEmoji}>{user?.streakEmoji || '🔥'}</Text>
+                <Text style={styles.streakNumber}>7</Text>
+                <Text style={styles.streakLabel}>Day Streak</Text>
+              </View>
+              <View style={styles.streakItem}>
+                <Text style={styles.streakEmoji}>⚡</Text>
+                <Text style={styles.streakNumber}>23</Text>
+                <Text style={styles.streakLabel}>Best Streak</Text>
+              </View>
+            </View>
+            
+            <View style={styles.badgeContainer}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeIcon}>🎨</Text>
+                <Text style={styles.badgeText}>AI Artist</Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeIcon}>👥</Text>
+                <Text style={styles.badgeText}>Social Butterfly</Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeIcon}>💪</Text>
+                <Text style={styles.badgeText}>Fitness Guru</Text>
+              </View>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -249,21 +217,112 @@ const DemoTabNavigator = () => (
     screenOptions={{
       headerShown: false,
       tabBarStyle: {
-        backgroundColor: '#161618',
-        borderTopColor: '#424242',
-        paddingBottom: 8,
-        paddingTop: 8,
-        height: 80,
+        backgroundColor: '#0D0D0F',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.1)',
+        paddingBottom: Platform.OS === 'ios' ? 12 : 16,
+        paddingTop: 6,
+        paddingHorizontal: 2,
+        height: Platform.OS === 'ios' ? 85 : 90,
+        elevation: 0,
+        shadowOpacity: 0,
       },
       tabBarActiveTintColor: '#FFDD3A',
-      tabBarInactiveTintColor: '#9E9E9E',
+      tabBarInactiveTintColor: '#666666',
+      tabBarLabelStyle: {
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 2,
+        marginBottom: 4,
+        letterSpacing: 0.1,
+        textAlign: 'center',
+      },
+      tabBarIconStyle: {
+        marginBottom: 1,
+        marginTop: 4,
+      },
+      tabBarItemStyle: {
+        paddingVertical: 3,
+        paddingHorizontal: 2,
+        height: Platform.OS === 'ios' ? 65 : 70,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexDirection: 'column',
+      },
     }}
   >
-    <Tab.Screen name="Chat" component={ChatStackNavigator} />
-    <Tab.Screen name="Stories" component={StoriesScreen} />
-    <Tab.Screen name="Camera" component={CameraScreen} />
-    <Tab.Screen name="Discover" component={DemoDiscoverScreen} />
-    <Tab.Screen name="Profile" component={DemoProfileScreen} />
+    <Tab.Screen 
+      name="Chat" 
+      component={ChatStackNavigator}
+      options={{
+        tabBarIcon: ({ color, focused }) => (
+          <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+            <Text style={{ fontSize: 18, color: focused ? '#FFDD3A' : '#666666' }}>💬</Text>
+          </View>
+        ),
+        tabBarLabel: 'Chat',
+      }}
+    />
+    <Tab.Screen 
+      name="Stories" 
+      component={StoriesScreen}
+      options={{
+        tabBarIcon: ({ color, focused }) => (
+          <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+            <Text style={{ fontSize: 18, color: focused ? '#FFDD3A' : '#666666' }}>📱</Text>
+          </View>
+        ),
+        tabBarLabel: 'Stories',
+      }}
+    />
+    <Tab.Screen 
+      name="Camera" 
+      component={CameraScreen}
+      options={{
+        tabBarIcon: ({ color, focused }) => (
+          <View style={[styles.cameraTabIcon, focused && styles.cameraTabIconActive]}>
+            <Text style={{ fontSize: 20, color: focused ? '#000000' : '#FFFFFF' }}>📸</Text>
+          </View>
+        ),
+        tabBarLabel: 'Camera',
+      }}
+    />
+    <Tab.Screen 
+      name="Fitness" 
+      component={FitnessScreen}
+      options={{
+        tabBarIcon: ({ color, focused }) => (
+          <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+            <Text style={{ fontSize: 18, color: focused ? '#FFDD3A' : '#666666' }}>💪</Text>
+          </View>
+        ),
+        tabBarLabel: 'Fitness',
+      }}
+    />
+    <Tab.Screen 
+      name="Discover" 
+      component={DiscoverScreen}
+      options={{
+        tabBarIcon: ({ color, focused }) => (
+          <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+            <Text style={{ fontSize: 18, color: focused ? '#FFDD3A' : '#666666' }}>🔍</Text>
+          </View>
+        ),
+        tabBarLabel: 'Discover',
+      }}
+    />
+    <Tab.Screen 
+      name="Profile" 
+      component={DemoProfileScreen}
+      options={{
+        tabBarIcon: ({ color, focused }) => (
+          <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
+            <Text style={{ fontSize: 18, color: focused ? '#FFDD3A' : '#666666' }}>👤</Text>
+          </View>
+        ),
+        tabBarLabel: 'Profile',
+      }}
+    />
   </Tab.Navigator>
 );
 
@@ -272,22 +331,12 @@ const MainStack = createStackNavigator();
 const DemoMainNavigator = () => (
   <MainStack.Navigator screenOptions={{ headerShown: false }}>
     <MainStack.Screen name="Tabs" component={DemoTabNavigator} />
-    <MainStack.Screen 
-      name="PhotoEditor" 
-      component={PhotoEditorScreen}
-      options={{
-        presentation: 'modal',
-        gestureEnabled: true,
-      }}
-    />
-    <MainStack.Screen 
-      name="ShareScreen" 
-      component={ShareScreen}
-      options={{
-        presentation: 'modal',
-        gestureEnabled: true,
-      }}
-    />
+    <MainStack.Screen name="ChatScreen" component={FitnessChatScreen} />
+    <MainStack.Screen name="PhotoEditor" component={PhotoEditorScreen} />
+    <MainStack.Screen name="ShareScreen" component={ShareScreen} />
+    <MainStack.Screen name="WorkoutSearchScreen" component={WorkoutSearchScreen} />
+    <MainStack.Screen name="FriendshipMemory" component={FriendshipMemoryScreen} />
+    <MainStack.Screen name="Settings" component={SettingsScreen} />
   </MainStack.Navigator>
 );
 
@@ -300,23 +349,38 @@ const DemoAuthNavigator = () => (
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
-  const { isAuthenticated, setAuthenticated, setUser, isLoading, setLoading } = useAppStore();
+  const { isAuthenticated, setAuthenticated, setUser, isLoading, setLoading, loadPersistedUser } = useAppStore();
 
   useEffect(() => {
-    if (DEMO_MODE) {
-      // Demo mode - show authentication screens first, then handle auth in AuthNavigator
-      console.log('🚀 Running in DEMO MODE - Authentication screens enabled');
-      setAuthenticated(false); // Start unauthenticated to show login screens
-      setLoading(false);
-      return;
-    }
+    const initializeApp = async () => {
+      if (DEMO_MODE) {
+        // Demo mode - show authentication screens first, then handle auth in AuthNavigator
+        console.log('🚀 App: Running in DEMO MODE - Authentication screens enabled');
+        
+        // Try to load persisted user data
+        console.log('🔄 App: Loading persisted user data...');
+        await loadPersistedUser();
+        const currentUser = useAppStore.getState().user;
+        if (currentUser) {
+          console.log('✅ App: Found persisted user with Snap Score:', currentUser.snapScore);
+        } else {
+          console.log('ℹ️ App: No persisted user found');
+        }
+        
+        setAuthenticated(false); // Start unauthenticated to show login screens
+        setLoading(false);
+        return;
+      }
 
-    // Real Firebase auth would go here (disabled in current demo mode)
-    console.log('Firebase auth disabled - please enable by setting DEMO_MODE = false and configuring Firebase');
-    setLoading(false);
-    setUser(null);
-    setAuthenticated(false);
-  }, [setAuthenticated, setUser, setLoading]);
+      // Real Firebase auth would go here (disabled in current demo mode)
+      console.log('Firebase auth disabled - please enable by setting DEMO_MODE = false and configuring Firebase');
+      setLoading(false);
+      setUser(null);
+      setAuthenticated(false);
+    };
+
+    initializeApp();
+  }, [setAuthenticated, setUser, setLoading, loadPersistedUser]);
 
   if (isLoading) {
     return (
@@ -532,135 +596,197 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#0D0D0F',
   },
-  searchContainer: {
-    flexDirection: 'row',
+  // Professional Tab Styles
+  tabIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#161618',
-    borderBottomWidth: 1,
-    borderBottomColor: '#424242',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  searchInput: {
-    flex: 1,
-    backgroundColor: '#0D0D0F',
-    borderRadius: 25,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    color: '#FFFFFF',
-    fontSize: 16,
+  tabIconActive: {
+    backgroundColor: 'rgba(255, 221, 58, 0.15)',
     borderWidth: 1,
-    borderColor: '#424242',
+    borderColor: 'rgba(255, 221, 58, 0.4)',
   },
-  searchIcon: {
-    position: 'absolute',
-    right: 35,
-    fontSize: 18,
-    color: '#9E9E9E',
-  },
-  contentCard: {
-    flexDirection: 'row',
+  cameraTabIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  cameraTabIconActive: {
+    backgroundColor: '#FFDD3A',
+    borderWidth: 1.5,
+    borderColor: '#FFDD3A',
+    transform: [{ scale: 1.05 }],
+  },
+  // AI Profile Features
+  aiStatsContainer: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 20,
-    marginHorizontal: 20,
-    marginVertical: 8,
+    marginBottom: 25,
+    paddingHorizontal: 10,
+  },
+  aiStatCard: {
     backgroundColor: '#161618',
     borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 4,
     borderWidth: 1,
     borderColor: '#424242',
   },
-  contentLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  aiStatIcon: {
+    fontSize: 20,
+    marginBottom: 5,
   },
-  contentEmoji: {
-    fontSize: 24,
-    marginRight: 15,
+  aiStatNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFDD3A',
+    marginBottom: 2,
   },
-  contentInfo: {
-    flex: 1,
+  aiStatLabel: {
+    fontSize: 10,
+    color: '#9E9E9E',
+    textAlign: 'center',
+    fontWeight: '600',
   },
-  contentTitle: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  contentCreator: {
+  activitySection: {
+    backgroundColor: '#161618',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#424242',
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  activityIcon: {
+    fontSize: 18,
+    marginRight: 14,
+    width: 28,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  activityContent: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  activityText: {
+    color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 18,
+    marginBottom: 2,
+  },
+  activitySubtext: {
     color: '#FFDD3A',
+    fontSize: 11,
+    fontWeight: '600',
     marginBottom: 4,
   },
-  contentMeta: {
+  activityTime: {
+    color: '#9E9E9E',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  activityItemLast: {
+    borderBottomWidth: 0,
+    marginBottom: 0,
+    paddingBottom: 0,
+  },
+  achievementsSection: {
+    backgroundColor: '#161618',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#424242',
+  },
+  streakContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  streakItem: {
+    alignItems: 'center',
+    backgroundColor: '#0D0D0F',
+    borderRadius: 10,
+    padding: 12,
+    minWidth: 80,
+  },
+  streakEmoji: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  streakNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFDD3A',
+    marginBottom: 2,
+  },
+  streakLabel: {
+    fontSize: 10,
+    color: '#9E9E9E',
+    fontWeight: '600',
+  },
+  badgeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  contentCategory: {
-    fontSize: 12,
-    color: '#9E9E9E',
-    backgroundColor: '#424242',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  contentViews: {
-    fontSize: 12,
-    color: '#9E9E9E',
-  },
-  viewButton: {
-    backgroundColor: '#FFDD3A',
+  badge: {
+    backgroundColor: '#0D0D0F',
     borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  viewButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#0D0D0F',
-  },
-  noResults: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 8,
     alignItems: 'center',
-    paddingVertical: 100,
+    flex: 1,
+    marginHorizontal: 2,
   },
-  noResultsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  badgeIcon: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  badgeText: {
     color: '#FFFFFF',
-    marginBottom: 10,
+    fontSize: 10,
+    fontWeight: '600',
   },
-  noResultsSubtext: {
-    fontSize: 14,
-    color: '#9E9E9E',
-  },
-  suggestions: {
-    padding: 20,
-  },
-  suggestionsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 15,
-  },
-  topicTags: {
+  // Header buttons
+  headerButtons: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    alignItems: 'center',
+    gap: 8,
   },
-  topicTag: {
-    backgroundColor: '#424242',
+  settingsButton: {
+    backgroundColor: '#161618',
     borderRadius: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#606060',
+    borderColor: '#424242',
   },
-  topicTagText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#FFFFFF',
+  settingsButtonText: {
+    fontSize: 16,
   },
+  // Old demo discover styles removed - using AI-powered DiscoverScreen
 });

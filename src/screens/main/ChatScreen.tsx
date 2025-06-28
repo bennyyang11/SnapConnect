@@ -25,6 +25,7 @@ interface ChatItemProps {
 const ChatItem: React.FC<ChatItemProps> = ({ chat, onPress }) => {
   const { user } = useAppStore();
   const otherParticipant = chat.participants.find(p => p !== user?.id);
+  const isGroup = chat.type === 'group';
   
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -36,19 +37,51 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, onPress }) => {
     return `${Math.floor(hours / 24)}d ago`;
   };
 
+  const getChatDisplayName = () => {
+    if (isGroup) {
+      return chat.name || `Group (${chat.participants.length})`;
+    }
+    return otherParticipant || 'Unknown';
+  };
+
+  const getChatAvatar = () => {
+    if (isGroup) {
+      return chat.avatar || '👥';
+    }
+    return otherParticipant?.charAt(0)?.toUpperCase() || '👤';
+  };
+
+  const getLastMessagePrefix = () => {
+    if (isGroup && chat.lastMessage) {
+      const senderName = chat.lastMessage.senderId === user?.id ? 'You' : chat.lastMessage.senderId;
+      return `${senderName}: `;
+    }
+    return '';
+  };
+
   return (
-    <TouchableOpacity style={styles.chatItem} onPress={onPress}>
-      <View style={styles.avatar}>
+    <TouchableOpacity style={styles.chatItem} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.avatar, isGroup && styles.groupAvatar]}>
         <Text style={styles.avatarText}>
-          {otherParticipant?.charAt(0)?.toUpperCase() || '👤'}
+          {getChatAvatar()}
         </Text>
+        {isGroup && (
+          <View style={styles.groupBadge}>
+            <Text style={styles.groupBadgeText}>{chat.participants.length}</Text>
+          </View>
+        )}
       </View>
       
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
-          <Text style={styles.chatName}>
-            {chat.name || otherParticipant || 'Unknown'}
-          </Text>
+          <View style={styles.chatNameContainer}>
+            <Text style={styles.chatName}>
+              {getChatDisplayName()}
+            </Text>
+            {isGroup && (
+              <Text style={styles.groupIndicator}>GROUP</Text>
+            )}
+          </View>
           <Text style={styles.chatTime}>
             {formatTime(chat.lastActivity)}
           </Text>
@@ -56,7 +89,7 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, onPress }) => {
         
         <View style={styles.lastMessageContainer}>
           <Text style={styles.lastMessage} numberOfLines={1}>
-            {chat.lastMessage?.content || 'Say hi! 👋'}
+            {getLastMessagePrefix()}{chat.lastMessage?.content || 'Say hi! 👋'}
           </Text>
           {chat.unreadCount > 0 && (
             <View style={styles.unreadBadge}>
@@ -68,11 +101,9 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, onPress }) => {
         </View>
       </View>
       
-      <View style={styles.chatActions}>
-        <TouchableOpacity style={styles.snapButton}>
-          <Text style={styles.snapText}>📷</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.snapButton} activeOpacity={0.7}>
+        <Text style={styles.snapText}>📷</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 };
@@ -83,7 +114,7 @@ interface FriendItemProps {
 }
 
 const FriendItem: React.FC<FriendItemProps> = ({ friend, onPress }) => (
-  <TouchableOpacity style={styles.friendItem} onPress={onPress}>
+  <TouchableOpacity style={styles.friendItem} onPress={onPress} activeOpacity={0.7}>
     <View style={styles.friendAvatar}>
       <Text style={styles.avatarText}>
         {friend.friendId.charAt(0)?.toUpperCase()}
@@ -91,12 +122,18 @@ const FriendItem: React.FC<FriendItemProps> = ({ friend, onPress }) => (
     </View>
     <View style={styles.friendInfo}>
       <Text style={styles.friendName}>{friend.friendId}</Text>
-      {friend.snapStreak > 0 && (
-        <View style={styles.streakContainer}>
-          <Text style={styles.streakText}>🔥 {friend.snapStreak}</Text>
-        </View>
-      )}
+      <View style={styles.friendMeta}>
+        {friend.snapStreak > 0 && (
+          <View style={styles.streakContainer}>
+            <Text style={styles.streakText}>🔥 {friend.snapStreak}</Text>
+          </View>
+        )}
+        <Text style={styles.mutualFriends}>👥 {friend.mutualFriends} mutual</Text>
+      </View>
     </View>
+    <TouchableOpacity style={styles.chatQuickButton} activeOpacity={0.7}>
+      <Text style={styles.chatQuickText}>💬</Text>
+    </TouchableOpacity>
   </TouchableOpacity>
 );
 
@@ -116,6 +153,9 @@ export default function ChatScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingFriend, setIsAddingFriend] = useState(false);
   const [friendUsername, setFriendUsername] = useState('');
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
 
   useEffect(() => {
     // Initialize with demo data
@@ -164,6 +204,53 @@ export default function ChatScreen() {
           unreadCount: 0,
           isTyping: [],
           createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+        },
+        {
+          id: '3',
+          participants: [user?.id || 'demo-user', 'john_doe', 'sarah_wilson', 'alex_chen'],
+          type: 'group',
+          name: 'Gym Buddies 💪',
+          avatar: '💪',
+          lastMessage: {
+            id: 'm3',
+            chatId: '3',
+            senderId: 'alex_chen',
+            type: 'text',
+            content: 'Anyone up for a workout session tomorrow?',
+            isRead: false,
+            readBy: [],
+            isTemporary: false,
+            reactions: [],
+            createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+            updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+          },
+          lastActivity: new Date(Date.now() - 1 * 60 * 60 * 1000),
+          unreadCount: 1,
+          isTyping: [],
+          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+        },
+        {
+          id: '4',
+          participants: [user?.id || 'demo-user', 'emma_davis', 'mike_johnson'],
+          type: 'group',
+          name: 'Weekend Plans',
+          lastMessage: {
+            id: 'm4',
+            chatId: '4',
+            senderId: 'emma_davis',
+            type: 'text',
+            content: 'Let\'s grab dinner this Saturday!',
+            isRead: true,
+            readBy: [],
+            isTemporary: false,
+            reactions: [],
+            createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+            updatedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+          },
+          lastActivity: new Date(Date.now() - 3 * 60 * 60 * 1000),
+          unreadCount: 0,
+          isTyping: [],
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
         }
       ];
       setChats(demoChats);
@@ -188,6 +275,33 @@ export default function ChatScreen() {
           createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
           snapStreak: 7,
           mutualFriends: 3,
+        },
+        {
+          id: '3',
+          userId: user?.id || 'demo-user',
+          friendId: 'alex_chen',
+          status: 'accepted',
+          createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+          snapStreak: 12,
+          mutualFriends: 2,
+        },
+        {
+          id: '4',
+          userId: user?.id || 'demo-user',
+          friendId: 'emma_davis',
+          status: 'accepted',
+          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          snapStreak: 3,
+          mutualFriends: 4,
+        },
+        {
+          id: '5',
+          userId: user?.id || 'demo-user',
+          friendId: 'mike_johnson',
+          status: 'accepted',
+          createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+          snapStreak: 0,
+          mutualFriends: 1,
         }
       ];
       setFriends(demoFriends);
@@ -202,6 +316,14 @@ export default function ChatScreen() {
           status: 'pending',
           message: 'Hey! Met you at the gym yesterday',
           createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        },
+        {
+          id: '2',
+          senderId: 'emma_davis',
+          receiverId: user?.id || 'demo-user',
+          status: 'pending',
+          message: 'Would love to connect! 🤝',
+          createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
         }
       ];
       setFriendRequests(demoRequests);
@@ -255,12 +377,83 @@ export default function ChatScreen() {
     );
   };
 
+  const createGroupChat = () => {
+    if (!groupName.trim()) {
+      Alert.alert('Error', 'Please enter a group name');
+      return;
+    }
+
+    if (selectedFriends.length < 2) {
+      Alert.alert('Error', 'Please select at least 2 friends for the group');
+      return;
+    }
+
+    const newGroupChat: Chat = {
+      id: `group_${Date.now()}`,
+      participants: [user?.id || 'demo-user', ...selectedFriends],
+      type: 'group',
+      name: groupName,
+      lastActivity: new Date(),
+      unreadCount: 0,
+      isTyping: [],
+      createdAt: new Date(),
+    };
+
+    setChats([newGroupChat, ...chats]);
+    setGroupName('');
+    setSelectedFriends([]);
+    setIsCreatingGroup(false);
+
+    Alert.alert(
+      '✅ Group Created!',
+      `"${groupName}" has been created with ${selectedFriends.length} friends`,
+      [
+        { 
+          text: 'Start Chatting', 
+          onPress: () => {
+            navigation.navigate('ChatDetail', {
+              chatId: newGroupChat.id,
+              contactName: groupName,
+            });
+          }
+        },
+        { text: 'OK' }
+      ]
+    );
+  };
+
+  const toggleFriendSelection = (friendId: string) => {
+    setSelectedFriends(prev => 
+      prev.includes(friendId) 
+        ? prev.filter(id => id !== friendId)
+        : [...prev, friendId]
+    );
+  };
+
   const acceptFriendRequest = (request: FriendRequest) => {
     Alert.alert(
       '✅ Friend Request Accepted!',
       `You and ${request.senderId} are now friends!`
     );
     // In real app, this would update the backend
+  };
+
+  const rejectFriendRequest = (request: FriendRequest) => {
+    Alert.alert(
+      'Reject Friend Request',
+      `Decline request from ${request.senderId}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Decline', 
+          style: 'destructive',
+          onPress: () => {
+            console.log('Rejected friend request from:', request.senderId);
+            Alert.alert('Request Declined', `You declined ${request.senderId}'s request`);
+          }
+        }
+      ]
+    );
   };
 
   const filteredChats = chats.filter(chat => 
@@ -272,128 +465,229 @@ export default function ChatScreen() {
     friend.friendId.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const pendingRequests = friendRequests.filter(r => r.status === 'pending');
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Enhanced Header - Fixed */}
       <View style={styles.header}>
-        <Text style={styles.title}>Chat</Text>
-        <View style={styles.headerActions}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.title}>Chat</Text>
+          <Text style={styles.subtitle}>Stay connected with friends</Text>
+        </View>
+        <View style={styles.headerButtons}>
           <TouchableOpacity 
             style={styles.addButton}
             onPress={() => setIsAddingFriend(true)}
+            activeOpacity={0.8}
           >
-            <Text style={styles.addButtonText}>👥+</Text>
+            <Text style={styles.addIcon}>👥</Text>
+            <Text style={styles.addText}>Add</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.groupButton}
+            onPress={() => setIsCreatingGroup(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.groupIcon}>🫂</Text>
+            <Text style={styles.groupText}>Group</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Friend Requests */}
-      {friendRequests.filter(r => r.status === 'pending').length > 0 && (
-        <View style={styles.requestsContainer}>
-          <Text style={styles.requestsTitle}>Friend Requests</Text>
-          {friendRequests
-            .filter(r => r.status === 'pending')
-            .map(request => (
-              <View key={request.id} style={styles.requestItem}>
-                <View style={styles.requestInfo}>
-                  <Text style={styles.requestSender}>{request.senderId}</Text>
-                  <Text style={styles.requestMessage}>{request.message}</Text>
-                </View>
-                <View style={styles.requestActions}>
-                  <TouchableOpacity 
-                    style={styles.acceptButton}
-                    onPress={() => acceptFriendRequest(request)}
-                  >
-                    <Text style={styles.acceptText}>✅</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.rejectButton}>
-                    <Text style={styles.rejectText}>❌</Text>
-                  </TouchableOpacity>
-                </View>
+      {/* Main Scrollable Content */}
+      <ScrollView 
+        style={styles.mainScrollView} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Enhanced Friend Requests */}
+        {pendingRequests.length > 0 && (
+          <View style={styles.requestsSection}>
+            <View style={styles.requestsHeader}>
+              <Text style={styles.requestsTitle}>Friend Requests</Text>
+              <View style={styles.requestsBadge}>
+                <Text style={styles.requestsBadgeText}>{pendingRequests.length}</Text>
               </View>
-            ))}
-        </View>
-      )}
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search friends or chats..."
-          placeholderTextColor="#9E9E9E"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'chats' && styles.activeTab]}
-          onPress={() => setActiveTab('chats')}
-        >
-          <Text style={[styles.tabText, activeTab === 'chats' && styles.activeTabText]}>
-            💬 Chats ({chats.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
-          onPress={() => setActiveTab('friends')}
-        >
-          <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
-            👥 Friends ({friends.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
-      <ScrollView style={styles.content}>
-        {activeTab === 'chats' ? (
-          filteredChats.length > 0 ? (
-            filteredChats.map(chat => (
-              <ChatItem 
-                key={chat.id} 
-                chat={chat} 
-                onPress={() => openChat(chat)}
-              />
-            ))
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>💬 No chats yet</Text>
-              <Text style={styles.emptySubtext}>Start a conversation with your friends!</Text>
             </View>
-          )
-        ) : (
-          filteredFriends.length > 0 ? (
-            filteredFriends.map(friend => (
-              <FriendItem 
-                key={friend.id} 
-                friend={friend} 
-                onPress={() => openFriendProfile(friend)}
-              />
-            ))
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>👥 No friends yet</Text>
-              <Text style={styles.emptySubtext}>Add friends to start chatting!</Text>
-            </View>
-          )
+            
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.requestsScroll}
+            >
+              {pendingRequests.map(request => (
+                <View key={request.id} style={styles.requestCard}>
+                  <View style={styles.requestProfileSection}>
+                    <View style={styles.requestAvatar}>
+                      <Text style={styles.requestAvatarText}>
+                        {request.senderId.charAt(0)?.toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.requestName}>{request.senderId}</Text>
+                    <Text style={styles.requestMessage} numberOfLines={2}>
+                      {request.message}
+                    </Text>
+                    <Text style={styles.requestTime}>
+                      {Math.floor((Date.now() - request.createdAt.getTime()) / (1000 * 60 * 60))}h ago
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.requestButtonSection}>
+                    <TouchableOpacity 
+                      style={styles.acceptButton}
+                      onPress={() => acceptFriendRequest(request)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.acceptButtonText}>Accept</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.declineButton}
+                      onPress={() => rejectFriendRequest(request)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.declineButtonText}>Decline</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
         )}
+
+        {/* Enhanced Search Bar */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchContainer}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search friends, chats..."
+              placeholderTextColor="#666"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity 
+                style={styles.clearButton}
+                onPress={() => setSearchQuery('')}
+              >
+                <Text style={styles.clearButtonText}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Enhanced Tabs */}
+        <View style={styles.tabSection}>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'chats' && styles.activeTab]}
+              onPress={() => setActiveTab('chats')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.tabIcon}>💬</Text>
+              <Text style={[styles.tabText, activeTab === 'chats' && styles.activeTabText]}>
+                Chats
+              </Text>
+              <View style={[styles.tabBadge, activeTab === 'chats' && styles.activeTabBadge]}>
+                <Text style={[styles.tabBadgeText, activeTab === 'chats' && styles.activeTabBadgeText]}>
+                  {chats.length}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'friends' && styles.activeTab]}
+              onPress={() => setActiveTab('friends')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.tabIcon}>👥</Text>
+              <Text style={[styles.tabText, activeTab === 'friends' && styles.activeTabText]}>
+                Friends
+              </Text>
+              <View style={[styles.tabBadge, activeTab === 'friends' && styles.activeTabBadge]}>
+                <Text style={[styles.tabBadgeText, activeTab === 'friends' && styles.activeTabBadgeText]}>
+                  {friends.length}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Content List */}
+        <View style={styles.contentList}>
+          {activeTab === 'chats' ? (
+            filteredChats.length > 0 ? (
+              <View style={styles.listContainer}>
+                {filteredChats.map(chat => (
+                  <ChatItem 
+                    key={chat.id} 
+                    chat={chat} 
+                    onPress={() => openChat(chat)}
+                  />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>💬</Text>
+                <Text style={styles.emptyTitle}>No chats yet</Text>
+                <Text style={styles.emptySubtext}>Start a conversation with your friends to see your chats here!</Text>
+              </View>
+            )
+          ) : (
+            filteredFriends.length > 0 ? (
+              <View style={styles.listContainer}>
+                {filteredFriends.map(friend => (
+                  <FriendItem 
+                    key={friend.id} 
+                    friend={friend} 
+                    onPress={() => openFriendProfile(friend)}
+                  />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>👥</Text>
+                <Text style={styles.emptyTitle}>No friends yet</Text>
+                <Text style={styles.emptySubtext}>Add friends to start chatting and sharing moments!</Text>
+              </View>
+            )
+          )}
+        </View>
       </ScrollView>
 
-      {/* Add Friend Modal */}
+      {/* Enhanced Add Friend Modal */}
       {isAddingFriend && (
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Add Friend</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Enter username..."
-              placeholderTextColor="#9E9E9E"
-              value={friendUsername}
-              onChangeText={setFriendUsername}
-              autoCapitalize="none"
-            />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Friend</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  setIsAddingFriend(false);
+                  setFriendUsername('');
+                }}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>Enter their username to send a friend request</Text>
+            
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputIcon}>@</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter username..."
+                placeholderTextColor="#666"
+                value={friendUsername}
+                onChangeText={setFriendUsername}
+                autoCapitalize="none"
+                autoFocus={true}
+              />
+            </View>
+            
             <View style={styles.modalActions}>
               <TouchableOpacity 
                 style={styles.cancelButton}
@@ -401,11 +695,122 @@ export default function ChatScreen() {
                   setIsAddingFriend(false);
                   setFriendUsername('');
                 }}
+                activeOpacity={0.8}
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.sendButton} onPress={addFriend}>
-                <Text style={styles.sendText}>Send Request</Text>
+              <TouchableOpacity 
+                style={[styles.sendButton, !friendUsername.trim() && styles.sendButtonDisabled]} 
+                onPress={addFriend}
+                disabled={!friendUsername.trim()}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.sendText, !friendUsername.trim() && styles.sendTextDisabled]}>
+                  Send Request
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Create Group Modal */}
+      {isCreatingGroup && (
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modal, styles.groupModal]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Create Group Chat</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => {
+                  setIsCreatingGroup(false);
+                  setGroupName('');
+                  setSelectedFriends([]);
+                }}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>Give your group a name and select friends to add</Text>
+            
+            <View style={styles.modalInputContainer}>
+              <Text style={styles.modalInputIcon}>🫂</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter group name..."
+                placeholderTextColor="#666"
+                value={groupName}
+                onChangeText={setGroupName}
+                autoCapitalize="words"
+              />
+            </View>
+
+            <Text style={styles.friendsSelectionTitle}>
+              Select Friends ({selectedFriends.length}/20)
+            </Text>
+            
+            <ScrollView style={styles.friendsSelection} showsVerticalScrollIndicator={false}>
+              {friends.map(friend => (
+                <TouchableOpacity
+                  key={friend.id}
+                  style={[
+                    styles.friendSelectionItem,
+                    selectedFriends.includes(friend.friendId) && styles.friendSelectionItemSelected
+                  ]}
+                  onPress={() => toggleFriendSelection(friend.friendId)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.friendSelectionAvatar}>
+                    <Text style={styles.avatarText}>
+                      {friend.friendId.charAt(0)?.toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.friendSelectionInfo}>
+                    <Text style={styles.friendSelectionName}>{friend.friendId}</Text>
+                    {friend.snapStreak > 0 && (
+                      <Text style={styles.friendSelectionStreak}>🔥 {friend.snapStreak}</Text>
+                    )}
+                  </View>
+                  <View style={[
+                    styles.selectionCheckbox,
+                    selectedFriends.includes(friend.friendId) && styles.selectionCheckboxSelected
+                  ]}>
+                    {selectedFriends.includes(friend.friendId) && (
+                      <Text style={styles.checkboxCheck}>✓</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => {
+                  setIsCreatingGroup(false);
+                  setGroupName('');
+                  setSelectedFriends([]);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[
+                  styles.createGroupButton, 
+                  (!groupName.trim() || selectedFriends.length < 2) && styles.createGroupButtonDisabled
+                ]} 
+                onPress={createGroupChat}
+                disabled={!groupName.trim() || selectedFriends.length < 2}
+                activeOpacity={0.8}
+              >
+                <Text style={[
+                  styles.createGroupText,
+                  (!groupName.trim() || selectedFriends.length < 2) && styles.createGroupTextDisabled
+                ]}>
+                  Create Group
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -420,142 +825,338 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0D0D0F',
   },
+  
+  // Enhanced Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 15,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1A1C',
+  },
+  headerLeft: {
+    flex: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '500',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFDD3A',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    shadowColor: '#FFDD3A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  addIcon: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  addText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#0D0D0F',
+  },
+  groupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  groupIcon: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  groupText: {
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  headerActions: {
+  
+  // Enhanced Friend Requests
+  requestsSection: {
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1A1C',
+  },
+  requestsHeader: {
     flexDirection: 'row',
-  },
-  addButton: {
-    backgroundColor: '#FFDD3A',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  addButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  requestsContainer: {
-    backgroundColor: '#161618',
-    marginHorizontal: 10,
-    marginBottom: 10,
-    borderRadius: 12,
-    padding: 15,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 15,
   },
   requestsTitle: {
     color: '#FFDD3A',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginRight: 10,
   },
-  requestItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  requestInfo: {
-    flex: 1,
-  },
-  requestSender: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  requestMessage: {
-    color: '#9E9E9E',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  requestActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  acceptButton: {
-    backgroundColor: '#4CAF50',
-    padding: 8,
-    borderRadius: 20,
-  },
-  acceptText: {
-    fontSize: 12,
-  },
-  rejectButton: {
-    backgroundColor: '#F44336',
-    padding: 8,
-    borderRadius: 20,
-  },
-  rejectText: {
-    fontSize: 12,
-  },
-  searchContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 15,
-  },
-  searchInput: {
-    backgroundColor: '#161618',
-    color: '#FFFFFF',
-    padding: 12,
-    borderRadius: 25,
-    fontSize: 16,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 15,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  activeTab: {
-    borderBottomColor: '#FFDD3A',
-  },
-  tabText: {
-    color: '#9E9E9E',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#FFDD3A',
-    fontWeight: 'bold',
-  },
-  content: {
-    flex: 1,
-  },
-  chatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    marginHorizontal: 10,
-    marginBottom: 8,
-    backgroundColor: '#161618',
+  requestsBadge: {
+    backgroundColor: '#FF4444',
     borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 24,
+    alignItems: 'center',
   },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  requestsBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  requestsScroll: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  requestCard: {
+    width: 180,
+    backgroundColor: '#1A1A1C',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#2A2A2C',
+  },
+  requestProfileSection: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  requestAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#FFDD3A',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 15,
+    marginBottom: 12,
+  },
+  requestAvatarText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#0D0D0F',
+  },
+  requestName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  requestMessage: {
+    color: '#888',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  requestTime: {
+    color: '#666',
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  requestButtonSection: {
+    gap: 8,
+  },
+  acceptButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  acceptButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  declineButton: {
+    backgroundColor: '#2A2A2C',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  declineButtonText: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  
+  // Enhanced Search
+  searchSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1C',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2C',
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 12,
+    color: '#888',
+  },
+  searchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  clearButton: {
+    padding: 4,
+  },
+  clearButtonText: {
+    color: '#888',
+    fontSize: 14,
+  },
+  
+  // Enhanced Tabs
+  tabSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#1A1A1C',
+    borderRadius: 16,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 6,
+  },
+  activeTab: {
+    backgroundColor: '#FFDD3A',
+  },
+  tabIcon: {
+    fontSize: 16,
+  },
+  tabText: {
+    color: '#888',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: '#0D0D0F',
+    fontWeight: 'bold',
+  },
+  tabBadge: {
+    backgroundColor: '#2A2A2C',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  activeTabBadge: {
+    backgroundColor: '#0D0D0F',
+  },
+  tabBadgeText: {
+    color: '#888',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  activeTabBadgeText: {
+    color: '#FFFFFF',
+  },
+  
+  // Main Scroll and Content
+  mainScrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  contentList: {
+    flex: 1,
+  },
+  listContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  
+  // Chat Items
+  chatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
+    backgroundColor: '#1A1A1C',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2A2A2C',
+  },
+  avatar: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FFDD3A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    position: 'relative',
+  },
+  groupAvatar: {
+    backgroundColor: '#4CAF50',
+  },
+  groupBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FF4444',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 20,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#1A1A1C',
+  },
+  groupBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   avatarText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#0D0D0F',
   },
@@ -568,155 +1169,342 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
+  chatNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   chatName: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
+    marginRight: 8,
+  },
+  groupIndicator: {
+    backgroundColor: '#4CAF50',
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    textAlign: 'center',
   },
   chatTime: {
-    color: '#9E9E9E',
-    fontSize: 12,
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '500',
   },
   lastMessageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   lastMessage: {
-    color: '#9E9E9E',
-    fontSize: 14,
+    color: '#888',
+    fontSize: 15,
     flex: 1,
+    fontWeight: '500',
   },
   unreadBadge: {
     backgroundColor: '#FFDD3A',
     borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     marginLeft: 8,
+    minWidth: 20,
+    alignItems: 'center',
   },
   unreadText: {
     color: '#0D0D0F',
     fontSize: 12,
     fontWeight: 'bold',
   },
-  chatActions: {
-    marginLeft: 10,
-  },
   snapButton: {
-    backgroundColor: '#424242',
-    padding: 8,
-    borderRadius: 20,
+    backgroundColor: '#2A2A2C',
+    padding: 12,
+    borderRadius: 24,
+    marginLeft: 12,
   },
   snapText: {
-    fontSize: 16,
+    fontSize: 18,
   },
+  
+  // Friend Items
   friendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    marginHorizontal: 10,
-    marginBottom: 8,
-    backgroundColor: '#161618',
-    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    backgroundColor: '#1A1A1C',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2A2A2C',
   },
   friendAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: '#FFDD3A',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 15,
+    marginRight: 16,
   },
   friendInfo: {
     flex: 1,
   },
   friendName: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  friendMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   streakContainer: {
-    marginTop: 4,
+    backgroundColor: '#2A2A2C',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   streakText: {
-    color: '#FF6B35',
-    fontSize: 14,
+    color: '#FFDD3A',
+    fontSize: 13,
     fontWeight: 'bold',
   },
+  mutualFriends: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  chatQuickButton: {
+    backgroundColor: '#2A2A2C',
+    padding: 12,
+    borderRadius: 24,
+    marginLeft: 12,
+  },
+  chatQuickText: {
+    fontSize: 18,
+  },
+  
+  // Empty States
   emptyContainer: {
     alignItems: 'center',
-    padding: 40,
-    marginTop: 50,
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
   },
-  emptyText: {
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 8,
-  },
-  emptySubtext: {
-    color: '#9E9E9E',
-    fontSize: 14,
     textAlign: 'center',
   },
+  emptySubtext: {
+    color: '#888',
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  
+  // Enhanced Modal
   modalOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   modal: {
-    backgroundColor: '#161618',
-    borderRadius: 15,
-    padding: 20,
-    width: '80%',
+    backgroundColor: '#1A1A1C',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: '#2A2A2C',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   modalTitle: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    textAlign: 'center',
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  modalCloseText: {
+    color: '#888',
+    fontSize: 18,
+  },
+  modalSubtitle: {
+    color: '#888',
+    fontSize: 15,
     marginBottom: 20,
+    lineHeight: 20,
+  },
+  modalInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2A2A2C',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  modalInputIcon: {
+    color: '#888',
+    fontSize: 16,
+    marginRight: 12,
+    fontWeight: 'bold',
   },
   modalInput: {
-    backgroundColor: '#0D0D0F',
+    flex: 1,
     color: '#FFFFFF',
-    padding: 12,
-    borderRadius: 8,
     fontSize: 16,
-    marginBottom: 20,
+    fontWeight: '500',
   },
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
   },
   cancelButton: {
-    backgroundColor: '#424242',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
     flex: 1,
-    marginRight: 10,
+    backgroundColor: '#2A2A2C',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#444',
   },
   cancelText: {
-    color: '#FFFFFF',
-    textAlign: 'center',
-    fontWeight: 'bold',
+    color: '#888',
+    fontSize: 16,
+    fontWeight: '600',
   },
   sendButton: {
-    backgroundColor: '#FFDD3A',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
     flex: 1,
+    backgroundColor: '#FFDD3A',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#333',
   },
   sendText: {
     color: '#0D0D0F',
-    textAlign: 'center',
+    fontSize: 16,
     fontWeight: 'bold',
+  },
+  sendTextDisabled: {
+    color: '#666',
+  },
+  
+  // Group Creation Modal
+  groupModal: {
+    maxHeight: '85%',
+  },
+  friendsSelectionTitle: {
+    color: '#FFDD3A',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  friendsSelection: {
+    maxHeight: 300,
+    marginBottom: 20,
+  },
+  friendSelectionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: '#2A2A2C',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  friendSelectionItemSelected: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  friendSelectionAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFDD3A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  friendSelectionInfo: {
+    flex: 1,
+  },
+  friendSelectionName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  friendSelectionStreak: {
+    color: '#FFDD3A',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  selectionCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#666',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionCheckboxSelected: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+  },
+  checkboxCheck: {
+    color: '#4CAF50',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  createGroupButton: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  createGroupButtonDisabled: {
+    backgroundColor: '#333',
+  },
+  createGroupText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  createGroupTextDisabled: {
+    color: '#666',
   },
 }); 

@@ -232,4 +232,65 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 **Built with ❤️ for the fitness community**
 
-*Revolutionizing fitness content creation through AI-powered personalization* 
+*Revolutionizing fitness content creation through AI-powered personalization*
+
+## Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```bash
+# OpenAI API Key (required for AI features)
+EXPO_PUBLIC_OPENAI_API_KEY=your_openai_api_key_here
+
+# Remove.bg API Key (optional - for automatic background removal of AI stickers)
+EXPO_PUBLIC_REMOVEBG_API_KEY=your_removebg_api_key_here
+```
+
+### Setting up Remove.bg API (Optional)
+
+To enable automatic background removal for AI-generated stickers:
+
+1. Sign up at [Remove.bg](https://www.remove.bg/api)
+2. Get your free API key (50 free API calls per month)
+3. Add it to your `.env` file as `EXPO_PUBLIC_REMOVEBG_API_KEY`
+
+**Benefits:**
+- Eliminates checkered background patterns on AI stickers
+- Creates clean, transparent stickers automatically
+- Better integration with photo editing
+
+**Note:** If you don't set up Remove.bg, the app will still work but AI stickers may have solid backgrounds instead of transparent ones.
+
+## 🎨 Enhanced AI Image Generation
+
+SnapConnect now features **Advanced AI Sticker Generation** with multiple model support and sophisticated prompt engineering:
+
+### **🤖 Multiple AI Models**
+- **DALL-E 3** - Latest OpenAI model with best prompt understanding
+- **DALL-E 2** - Reliable model with fast generation  
+- **Stable Diffusion XL** - Open-source model with artistic styles (coming soon)
+
+### **🧠 Advanced Prompt Engineering**
+- **Context-Aware Prompts** - Automatically analyzes your photo context
+- **Fitness-Themed Enhancements** - Optimized for fitness content
+- **Technical Specifications** - Professional camera terms and lighting
+- **Style Optimization** - Trending artistic styles and compositions
+
+### **✨ Key Features**
+- **Smart Fallback System** - Automatically tries alternative models if primary fails
+- **Background Removal** - Automatic transparency using Remove.bg API
+- **Image Upscaling** - Optional quality enhancement (configurable)
+- **Model Selection UI** - Choose your preferred AI model
+- **Real-time Feedback** - See which model generated your sticker
+
+### **🔧 Technical Enhancements**
+- **HD Quality** - DALL-E 3 generates 1024x1024 HD images
+- **Vivid Style** - More dynamic and colorful results
+- **Professional Lighting** - Studio-quality lighting specifications
+- **Clean Edges** - Optimized for perfect sticker cutouts
+
+### **🎯 Prompt Engineering Features**
+- **Contextual Analysis** - Detects objects, characters, and abstract elements
+- **Dynamic Enhancement** - Adds appropriate technical specifications
+- **Fitness Context** - Incorporates gym/workout environment awareness
+- **Artistic Flair** - "Trending on ArtStation" style improvements 

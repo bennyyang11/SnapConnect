@@ -748,80 +748,137 @@ export default function StoriesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Enhanced Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Stories</Text>
-        <TouchableOpacity style={styles.addStoryButton} onPress={addStory}>
-          <Text style={styles.addStoryText}>+ Add Story</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.title}>Stories</Text>
+          <Text style={styles.subtitle}>Share moments with friends</Text>
+        </View>
+        <TouchableOpacity style={styles.addStoryButton} onPress={addStory} activeOpacity={0.8}>
+          <Text style={styles.addStoryIcon}>📸</Text>
+          <Text style={styles.addStoryText}>Add Story</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* My Stories Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Stories</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesRow}>
-            {myStoryData.length > 0 ? (
-              myStoryData.map((story, index) => (
-                <StoryItem
-                  key={story.id}
-                  story={story}
-                  onPress={() => openStory(story, index)}
-                  isMyStory={true}
-                />
-              ))
-            ) : (
-              <TouchableOpacity style={styles.addStoryItem} onPress={addStory}>
-                <View style={styles.addStoryRing}>
-                  <Text style={styles.addStoryIcon}>+</Text>
-                </View>
-                <Text style={styles.addStoryLabel}>Add Story</Text>
-              </TouchableOpacity>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>📖 My Stories</Text>
+            {myStoryData.length > 0 && (
+              <View style={styles.sectionBadge}>
+                <Text style={styles.sectionBadgeText}>{myStoryData.length}</Text>
+              </View>
             )}
-          </ScrollView>
+          </View>
+          <View style={styles.storiesContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesRow}>
+              {myStoryData.length > 0 ? (
+                myStoryData.map((story, index) => (
+                  <StoryItem
+                    key={story.id}
+                    story={story}
+                    onPress={() => openStory(story, index)}
+                    isMyStory={true}
+                  />
+                ))
+              ) : (
+                <TouchableOpacity style={styles.addStoryItem} onPress={addStory} activeOpacity={0.7}>
+                  <View style={styles.addStoryRing}>
+                    <Text style={styles.addStoryPlusIcon}>+</Text>
+                  </View>
+                  <Text style={styles.addStoryLabel}>Add Story</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+          </View>
         </View>
 
         {/* Friends Stories Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Friends</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesRow}>
-            {otherStories.length > 0 ? (
-              otherStories.map((story, index) => (
-                <StoryItem
-                  key={story.id}
-                  story={story}
-                  onPress={() => openStory(story, index)}
-                />
-              ))
-            ) : (
-              <View style={styles.emptyStories}>
-                <Text style={styles.emptyText}>No stories yet</Text>
-                <Text style={styles.emptySubtext}>Your friends' stories will appear here</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>👥 Friends</Text>
+            {otherStories.length > 0 && (
+              <View style={styles.sectionBadge}>
+                <Text style={styles.sectionBadgeText}>{otherStories.length}</Text>
               </View>
             )}
-          </ScrollView>
+          </View>
+          <View style={styles.storiesContainer}>
+            {otherStories.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesRow}>
+                {otherStories.map((story, index) => (
+                  <StoryItem
+                    key={story.id}
+                    story={story}
+                    onPress={() => openStory(story, index)}
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyStories}>
+                <Text style={styles.emptyIcon}>👻</Text>
+                <Text style={styles.emptyTitle}>No stories yet</Text>
+                <Text style={styles.emptySubtext}>Your friends' stories will appear here when they share moments</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* Recent Activity */}
+        {/* Enhanced Recent Activity */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <View style={styles.activityContainer}>
-            <Text style={styles.activityText}>
-              📸 john_doe viewed your story "My first story on SnapConnect!"
-            </Text>
-            <Text style={styles.activityTime}>2 hours ago</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🔔 Recent Activity</Text>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>3</Text>
+            </View>
           </View>
-          <View style={styles.activityContainer}>
-            <Text style={styles.activityText}>
-              🐦 sarah_wilson replied to your story: "That bird documentary looks amazing! 🌿"
-            </Text>
-            <Text style={styles.activityTime}>4 hours ago</Text>
-          </View>
-          <View style={styles.activityContainer}>
-            <Text style={styles.activityText}>
-              🔥 john_doe started a 3-day snap streak with you!
-            </Text>
-            <Text style={styles.activityTime}>5 hours ago</Text>
+          <View style={styles.activitySection}>
+            <View style={styles.activityCard}>
+              <View style={styles.activityHeader}>
+                <View style={styles.activityAvatar}>
+                  <Text style={styles.activityAvatarText}>J</Text>
+                </View>
+                <View style={styles.activityInfo}>
+                  <Text style={styles.activityUser}>john_doe</Text>
+                  <Text style={styles.activityAction}>viewed your story</Text>
+                </View>
+                <Text style={styles.activityTime}>2h ago</Text>
+              </View>
+              <Text style={styles.activityStoryTitle}>"My first story on SnapConnect!"</Text>
+            </View>
+
+            <View style={styles.activityCard}>
+              <View style={styles.activityHeader}>
+                <View style={styles.activityAvatar}>
+                  <Text style={styles.activityAvatarText}>S</Text>
+                </View>
+                <View style={styles.activityInfo}>
+                  <Text style={styles.activityUser}>sarah_wilson</Text>
+                  <Text style={styles.activityAction}>replied to your story</Text>
+                </View>
+                <Text style={styles.activityTime}>4h ago</Text>
+              </View>
+              <View style={styles.replyContainer}>
+                <Text style={styles.replyText}>"That bird documentary looks amazing! 🌿"</Text>
+              </View>
+            </View>
+
+            <View style={styles.activityCard}>
+              <View style={styles.activityHeader}>
+                <View style={[styles.activityAvatar, styles.streakAvatar]}>
+                  <Text style={styles.activityAvatarText}>🔥</Text>
+                </View>
+                <View style={styles.activityInfo}>
+                  <Text style={styles.activityUser}>john_doe</Text>
+                  <Text style={styles.activityAction}>started a 3-day snap streak</Text>
+                </View>
+                <Text style={styles.activityTime}>5h ago</Text>
+              </View>
+              <View style={styles.streakContainer}>
+                <Text style={styles.streakText}>Keep snapping to maintain your streak! 🔥</Text>
+              </View>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -855,22 +912,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 15,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1A1C',
+  },
+  headerLeft: {
+    flex: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '500',
   },
   addStoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFDD3A',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 20,
+    shadowColor: '#FFDD3A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  addStoryIcon: {
+    fontSize: 16,
+    marginRight: 6,
   },
   addStoryText: {
     color: '#0D0D0F',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   content: {
@@ -879,12 +958,39 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 30,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
   sectionTitle: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
-    paddingHorizontal: 20,
+    flex: 1,
+  },
+  sectionBadge: {
+    backgroundColor: '#FFDD3A',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  sectionBadgeText: {
+    color: '#0D0D0F',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  storiesContainer: {
+    backgroundColor: '#1A1A1C',
+    borderRadius: 16,
+    paddingVertical: 16,
+    marginHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#2A2A2C',
   },
   storiesRow: {
     paddingLeft: 20,
@@ -983,6 +1089,10 @@ const styles = StyleSheet.create({
     fontSize: 30,
     color: '#9E9E9E',
   },
+  addStoryPlusIcon: {
+    fontSize: 30,
+    color: '#9E9E9E',
+  },
   addStoryLabel: {
     color: '#9E9E9E',
     fontSize: 12,
@@ -990,18 +1100,25 @@ const styles = StyleSheet.create({
   },
   emptyStories: {
     alignItems: 'center',
-    padding: 20,
+    padding: 40,
+    marginHorizontal: 20,
   },
-  emptyText: {
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtext: {
-    color: '#9E9E9E',
-    fontSize: 14,
+    color: '#888',
+    fontSize: 15,
     textAlign: 'center',
-    marginTop: 5,
+    lineHeight: 20,
   },
   activityContainer: {
     backgroundColor: '#161618',
@@ -1015,10 +1132,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     marginBottom: 5,
-  },
-  activityTime: {
-    color: '#9E9E9E',
-    fontSize: 12,
   },
   storyViewerModal: {
     position: 'absolute',
@@ -1270,5 +1383,94 @@ const styles = StyleSheet.create({
     color: '#0D0D0F',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  
+  // Enhanced Activity Styles
+  activitySection: {
+    paddingHorizontal: 20,
+  },
+  activityCard: {
+    backgroundColor: '#1A1A1C',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2C',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  activityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  activityAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFDD3A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  activityAvatarText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0D0D0F',
+  },
+  activityInfo: {
+    flex: 1,
+  },
+  activityUser: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  activityAction: {
+    color: '#888',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activityTime: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  activityStoryTitle: {
+    color: '#FFDD3A',
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginLeft: 52,
+  },
+  replyContainer: {
+    backgroundColor: '#2A2A2C',
+    borderRadius: 12,
+    padding: 12,
+    marginLeft: 52,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4CAF50',
+  },
+  replyText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  streakAvatar: {
+    backgroundColor: '#FF6B35',
+  },
+  streakContainer: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 12,
+    padding: 12,
+    marginLeft: 52,
+  },
+  streakText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 }); 

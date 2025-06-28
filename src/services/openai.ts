@@ -339,4 +339,61 @@ Challenge should:
   }
 }
 
+// Additional functions for AI features
+export const generateCaption = async (imageUri: string, prompt: string): Promise<string> => {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured. Please add EXPO_PUBLIC_OPENAI_API_KEY to your .env file.');
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4-vision-preview',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: imageUri } }
+          ]
+        }
+      ],
+      max_tokens: 150,
+      temperature: 0.7,
+    });
+
+    return response.choices[0]?.message?.content || 'Unable to generate caption';
+  } catch (error) {
+    console.error('Error generating caption:', error);
+    throw new Error('Failed to generate caption');
+  }
+};
+
+export const analyzeImage = async (imageUri: string, prompt: string): Promise<string> => {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured. Please add EXPO_PUBLIC_OPENAI_API_KEY to your .env file.');
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4-vision-preview',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: imageUri } }
+          ]
+        }
+      ],
+      max_tokens: 200,
+      temperature: 0.3,
+    });
+
+    return response.choices[0]?.message?.content || '{"mood":"unknown","objects":[],"colors":[],"tags":[]}';
+  } catch (error) {
+    console.error('Error analyzing image:', error);
+    return '{"mood":"unknown","objects":[],"colors":[],"tags":[]}';
+  }
+};
+
 export const openAIService = new OpenAIService(); 

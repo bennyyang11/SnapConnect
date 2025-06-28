@@ -17,6 +17,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppStore } from '../../store/useAppStore';
 import { MainTabParamList, Friend, Story, Message, Chat } from '../../types';
+import WorkoutMemoryService from '../../services/workoutMemoryService';
+import FriendshipMemoryService from '../../services/friendshipMemoryService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -67,7 +69,7 @@ export default function ShareScreen() {
   const route = useRoute<ShareScreenRouteProp>();
   const { photoUri, mediaType, caption, storyReply } = route.params;
 
-  const { user, friends, addStory, chats, addMessage, setChats } = useAppStore();
+  const { user, friends, addStory, chats, addMessage, setChats, incrementSnapScore } = useAppStore();
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [imageError, setImageError] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -153,9 +155,12 @@ export default function ShareScreen() {
       
       addMessage(chatId, replyMessage);
       
+      // 📊 Increment snap score for sending story reply (+1)
+      incrementSnapScore(1);
+      
       Alert.alert(
         '📤 Story Reply Sent!',
-        `Your ${mediaType} reply was sent to ${storyReply.storyUserId}!`,
+        `Your ${mediaType} reply was sent to ${storyReply.storyUserId}! 📊 +1 Snap Score!`,
         [{ text: 'OK', onPress: () => {
           navigation.goBack();
           navigation.goBack();
@@ -195,17 +200,49 @@ export default function ShareScreen() {
       };
 
       addStory(newStory);
+
+      // 📊 Increment snap score for posting story (+1)
+      incrementSnapScore(1);
+
+      // 🏋️ Check if this is workout content and store in SnapSearch AI
+      const captionText = caption.trim();
+      if (captionText && WorkoutMemoryService.isWorkoutContent(captionText)) {
+        console.log('🏋️ Workout content detected, storing in SnapSearch AI...');
+        
+        try {
+          const workoutEntry = await WorkoutMemoryService.storeWorkoutMemory(
+            user?.id || 'demo-user',
+            photoUri,
+            mediaType as 'photo' | 'video',
+            captionText
+          );
+
+          if (workoutEntry) {
+            const workoutInfo = WorkoutMemoryService.extractWorkoutInfo(captionText);
+            console.log('✅ Workout stored successfully:', {
+              muscleGroups: workoutInfo.muscleGroups,
+              exercises: workoutInfo.exercises,
+              workoutTypes: workoutInfo.detectedWorkouts
+            });
+          }
+        } catch (error) {
+          console.error('❌ Error storing workout memory:', error);
+        }
+      }
       
+      const isWorkout = captionText && WorkoutMemoryService.isWorkoutContent(captionText);
       const successMessage = isTestUri && mediaType === 'video' 
         ? testUriType === 'recorded-successfully'
-          ? 'Your video was recorded successfully and has been added to your story!'
+          ? 'Your video was recorded successfully and has been added to your story! 📊 +1 Snap Score!'
           : testUriType === 'error'
-          ? 'There was an error with video recording, but it has been added to your story.'
-          : 'Your video recording has been added to your story!'
-        : 'Your story is now live and visible to your friends for 24 hours.';
+          ? 'There was an error with video recording, but it has been added to your story. 📊 +1 Snap Score!'
+          : 'Your video recording has been added to your story! 📊 +1 Snap Score!'
+        : isWorkout 
+          ? '🏋️ Workout added to your story and saved to SnapSearch AI! You can now search for this workout later. 📊 +1 Snap Score!'
+          : 'Your story is now live and visible to your friends for 24 hours. 📊 +1 Snap Score!';
         
       Alert.alert(
-        '✨ Added to Your Story!',
+        isWorkout ? '🏋️ Workout Story Posted!' : '✨ Added to Your Story!',
         successMessage,
         [{ text: 'OK', onPress: () => {
           // Go back to camera/main screen
@@ -225,6 +262,56 @@ export default function ShareScreen() {
     }
 
     try {
+      // 🏋️ Check if this is workout content and store in SnapSearch AI
+      const captionText = caption.trim();
+      if (captionText && WorkoutMemoryService.isWorkoutContent(captionText)) {
+        console.log('🏋️ Workout content detected in snap, storing in SnapSearch AI...');
+        
+        try {
+          const workoutEntry = await WorkoutMemoryService.storeWorkoutMemory(
+            user?.id || 'demo-user',
+            photoUri,
+            mediaType as 'photo' | 'video',
+            captionText
+          );
+
+          if (workoutEntry) {
+            const workoutInfo = WorkoutMemoryService.extractWorkoutInfo(captionText);
+            console.log('✅ Workout snap stored successfully:', {
+              muscleGroups: workoutInfo.muscleGroups,
+              exercises: workoutInfo.exercises,
+              workoutTypes: workoutInfo.detectedWorkouts
+            });
+          }
+        } catch (error) {
+          console.error('❌ Error storing workout memory:', error);
+        }
+      }
+
+      // 🤖 Track friendship memories for all selected friends
+      for (const friendId of selectedFriends) {
+        try {
+          const snapMetadata = {
+            caption: caption.trim() || `${mediaType === 'photo' ? '📸 Photo' : '📹 Video'} snap`,
+            imageUri: mediaType === 'photo' ? photoUri : undefined,
+            videoUri: mediaType === 'video' ? photoUri : undefined,
+            filterUsed: 'none', // No filter info available in share screen
+            mood: 'happy', // Default mood, could be enhanced with AI analysis
+            tags: ['snap', mediaType, 'shared'],
+          };
+
+          await FriendshipMemoryService.trackFriendshipSnap(
+            user?.id || 'demo-user',
+            friendId,
+            snapMetadata
+          );
+
+          console.log(`✅ Friendship memory tracked for ${friendId}`);
+        } catch (error) {
+          console.error(`❌ Failed to track friendship memory for ${friendId}:`, error);
+        }
+      }
+
       // Send to each selected friend
       for (const friendId of selectedFriends) {
         // Find or create chat
@@ -262,18 +349,25 @@ export default function ShareScreen() {
         addMessage(chatId, snapMessage);
       }
 
+      // 📊 Increment snap score for sending snaps (+1 per friend)
+      incrementSnapScore(selectedFriends.length);
+
       const friendCount = selectedFriends.length;
       const friendText = friendCount === 1 ? 'friend' : 'friends';
+      const isWorkout = captionText && WorkoutMemoryService.isWorkoutContent(captionText);
+      
       const successMessage = isTestUri && mediaType === 'video'
         ? testUriType === 'recorded-successfully'
-          ? `Your video was recorded successfully and sent to ${friendCount} ${friendText}!`
+          ? `Your video was recorded successfully and sent to ${friendCount} ${friendText}! 🤖 Friendship memories tracked by AI. 📊 +${friendCount} Snap Score!`
           : testUriType === 'error'
-          ? `There was an error with video recording, but it was sent to ${friendCount} ${friendText}.`
-          : `Your video recording was sent to ${friendCount} ${friendText}!`
-        : `Your ${mediaType} was sent to ${friendCount} ${friendText}.`;
+          ? `There was an error with video recording, but it was sent to ${friendCount} ${friendText}. 🤖 Friendship memories tracked by AI. 📊 +${friendCount} Snap Score!`
+          : `Your video recording was sent to ${friendCount} ${friendText}! 🤖 Friendship memories tracked by AI. 📊 +${friendCount} Snap Score!`
+        : isWorkout
+          ? `🏋️ Your workout ${mediaType} was sent to ${friendCount} ${friendText} and saved to SnapSearch AI! 🤖 Friendship memories tracked. 📊 +${friendCount} Snap Score!`
+          : `Your ${mediaType} was sent to ${friendCount} ${friendText}. 🤖 Friendship memories tracked by AI! 📊 +${friendCount} Snap Score!`;
       
       Alert.alert(
-        '📤 Snap Sent!',
+        isWorkout ? '🏋️ Workout Snap Sent!' : '📤 Snap Sent!',
         successMessage,
         [{ text: 'OK', onPress: () => {
           // Go back to camera/main screen

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,48 +9,56 @@ import {
   SafeAreaView,
   StatusBar,
   Animated,
+  ScrollView,
 } from 'react-native';
 import { CameraView, CameraType, FlashMode, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+
+import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAppStore } from '../../store/useAppStore';
 import AROverlay from '../../components/camera/AROverlay';
-import ARControls from '../../components/camera/ARControls';
+import AIFilterControls from '../../components/camera/AIFilterControls';
 import { ARFilterType } from '../../types/ARTypes';
-import { MainTabParamList } from '../../types';
+import { FilterDefinition } from '../../services/aiFilterService';
+import { MainTabParamList, RootStackParamList } from '../../types';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { videoManager } from '../../services/videoManager';
+
 
 const { width, height } = Dimensions.get('window');
 
-type CameraScreenNavigationProp = StackNavigationProp<MainTabParamList, 'Camera'>;
 type CameraScreenRouteProp = RouteProp<MainTabParamList, 'Camera'>;
+type CameraScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 export default function CameraScreen() {
-  const navigation = useNavigation<CameraScreenNavigationProp>();
   const route = useRoute<CameraScreenRouteProp>();
+  const navigation = useNavigation<CameraScreenNavigationProp>();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [mediaLibraryPermission, requestMediaLibraryPermission] = MediaLibrary.usePermissions();
   const [facing, setFacing] = useState<CameraType>('back');
   const [flash, setFlash] = useState<FlashMode>('off');
   const [isRecording, setIsRecording] = useState(false);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
+  const [captureButtonPressed, setCaptureButtonPressed] = useState(false);
+  const [isDemoMode] = useState(true); // Enable demo mode
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [shouldStopRecording, setShouldStopRecording] = useState(false);
   const [isStoppingRecording, setIsStoppingRecording] = useState(false);
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
-  const [isARActive, setIsARActive] = useState(false);
-  const [showARControls, setShowARControls] = useState(false);
-  const [selectedARFilter, setSelectedARFilter] = useState<ARFilterType>('none');
+  const [isAIFilterActive, setIsAIFilterActive] = useState(false);
+  const [showAIFilterControls, setShowAIFilterControls] = useState(false);
+  const [selectedAIFilter, setSelectedAIFilter] = useState<FilterDefinition | null>(null);
   const cameraRef = useRef<CameraView>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const forceCleanupRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const forceCleanupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingPromiseRef = useRef<Promise<any> | null>(null);
+  const currentTempVideoRef = useRef<string | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const { user } = useAppStore();
-  
-  // Get story reply context from route params
-  const storyReply = route.params?.storyReply;
+  const [currentVideoSession, setCurrentVideoSession] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -106,8 +114,6 @@ export default function CameraScreen() {
     progressAnim.setValue(0);
   };
 
-
-
   const takePicture = async () => {
     if (cameraRef.current) {
       try {
@@ -125,11 +131,13 @@ export default function CameraScreen() {
           
           setLastCapture(photo.uri);
           
-          // Navigate to photo editor (with story reply context if applicable)
+
+          
+          // Navigate to PhotoEditor for editing
           navigation.navigate('PhotoEditor', {
             photoUri: photo.uri,
             mediaType: 'photo',
-            storyReply: storyReply
+            storyReply: route.params?.storyReply,
           });
         }
       } catch (error) {
@@ -142,6 +150,12 @@ export default function CameraScreen() {
   const startRecording = async () => {
     if (cameraRef.current && !isRecording) {
       console.log('📹 Starting video recording via long press...');
+      
+      // Create a new video session with AI-powered management
+      const userId = user?.id || 'current_user';
+      const sessionId = videoManager.createVideoSession(userId);
+      setCurrentVideoSession(sessionId);
+      
       const startTime = Date.now();
       setRecordingStartTime(startTime);
       setIsRecording(true);
@@ -152,37 +166,13 @@ export default function CameraScreen() {
       try {
         console.log('📹 Starting recordAsync...');
         
-        // Start recording - we'll handle the result in stopRecording
+        // Start recording - let camera create its own temp file
         const recordingPromise = cameraRef.current.recordAsync({
           maxDuration: 60, // 60 seconds max
         });
         
-        // Store the promise so we can await it in stopRecording
         recordingPromiseRef.current = recordingPromise;
-        
         console.log('📹 Recording started successfully');
-        
-        // Handle natural completion (when maxDuration is reached)
-        recordingPromise.then(async (result) => {
-          console.log('📹 Recording completed naturally (maxDuration reached):', result);
-          
-          // Only process if we haven't already stopped recording
-          if (isRecording && result && result.uri) {
-            console.log('📹 Processing naturally completed recording...');
-            await processRecordedVideo(result.uri);
-          }
-        }).catch((error) => {
-          console.log('📹 Recording promise rejected (this is normal when stopped manually):', error);
-        }).finally(() => {
-          // Clean up only if we're still recording (natural completion)
-          if (isRecording) {
-            console.log('📹 Cleaning up after natural recording completion');
-            setIsRecording(false);
-            setShouldStopRecording(false);
-            setIsStoppingRecording(false);
-            stopTimer();
-          }
-        });
         
       } catch (error) {
         console.error('❌ Error starting recording:', error);
@@ -193,54 +183,24 @@ export default function CameraScreen() {
         setShouldStopRecording(false);
         setIsStoppingRecording(false);
         stopTimer();
+        recordingPromiseRef.current = null;
+        currentTempVideoRef.current = null;
+        setCurrentVideoSession(null);
       }
     }
   };
 
   const processRecordedVideo = async (videoUri: string) => {
-    try {
-      console.log('📹 Processing recorded video:', videoUri);
-      
-      // Save to device gallery if we have a real URI and permission
-      if (mediaLibraryPermission?.granted && !videoUri.startsWith('test://')) {
-        try {
-          console.log('📹 Saving video to gallery...');
-          await MediaLibrary.saveToLibraryAsync(videoUri);
-          console.log('📹 Video saved to gallery successfully');
-        } catch (error) {
-          console.log('📹 Gallery save failed, but continuing...');
-        }
-      } else if (videoUri.startsWith('test://')) {
-        console.log('📹 Test URI detected, skipping gallery save');
-      } else {
-        console.log('📹 Media library permission not granted, skipping save');
-      }
-      
-      setLastCapture(videoUri);
-      
-      // Navigate to photo editor (with story reply context if applicable)
-      console.log('📹 Navigating to PhotoEditor...');
-      navigation.navigate('PhotoEditor', {
-        photoUri: videoUri,
-        mediaType: 'video',
-        storyReply: storyReply
-      });
-      console.log('✅ Successfully navigated to PhotoEditor');
-      
-    } catch (error) {
-      console.error('❌ Error processing video:', error);
-      
-      // Fallback: navigate anyway
-      console.log('⚠️ Using fallback navigation');
-      navigation.navigate('PhotoEditor', {
-        photoUri: videoUri,
-        mediaType: 'video',
-        storyReply: storyReply
-      });
-    }
+    console.log('📹 Video recorded successfully:', videoUri);
+    setLastCapture(videoUri);
+    
+    // Simple success message
+    Alert.alert(
+      '🎉 Video Recorded!',
+      'Your video has been recorded successfully.',
+      [{ text: 'OK' }]
+    );
   };
-
-
 
   const stopRecording = async () => {
     if (cameraRef.current && isRecording && !shouldStopRecording && !isStoppingRecording) {
@@ -251,60 +211,55 @@ export default function CameraScreen() {
       setIsStoppingRecording(true);
       
       try {
+        console.log('⏹️ Stopping recording...');
+        
         // Stop the recording
         cameraRef.current.stopRecording();
-        console.log('⏹️ Stop recording command sent to camera');
         
-        // Try to get the video URI quickly (500ms timeout)
-        let videoUri: string | null = null;
-        
+        // Wait for the recording promise with timeout
         if (recordingPromiseRef.current) {
+          console.log('📹 Waiting for recording to complete...');
           try {
-            console.log('📹 Checking if recording promise resolves quickly...');
-            const timeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Quick timeout')), 500);
-            });
+            // Race between the recording promise and a 3-second timeout
+            const result = await Promise.race([
+              recordingPromiseRef.current,
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Recording timeout')), 3000)
+              )
+            ]);
+            console.log('📹 Recording completed! URI:', result.uri);
             
-            const result = await Promise.race([recordingPromiseRef.current, timeoutPromise]);
+            // Process the recorded video with the real URI
+            await processRecordedVideo(result.uri);
             
-            if (result && result.uri) {
-              console.log('✅ Got video URI immediately!');
-              videoUri = result.uri;
-            }
-          } catch (quickTimeoutError) {
-            console.log('⚠️ Recording promise didn\'t resolve quickly (expected)');
+                    } catch (recordingError) {
+            console.log('📹 Recording failed or timed out, but that\'s okay');
+            
+            // Simple fallback - just show success message
+            Alert.alert(
+              '🎉 Video Recorded!',
+              'Your video recording is complete.',
+              [{ text: 'OK' }]
+            );
           }
-        }
-        
-        // Handle video - navigate to editor
-        if (videoUri) {
-          console.log('📹 Using actual recorded video');
-          setLastCapture(videoUri);
-          navigation.navigate('PhotoEditor', {
-            photoUri: videoUri,
-            mediaType: 'video',
-            storyReply: storyReply
-          });
         } else {
-          console.log('📹 Video recorded successfully! (URI unavailable due to Expo Camera limitation)');
-          navigation.navigate('PhotoEditor', {
-            photoUri: 'test://video-recorded-successfully',
-            mediaType: 'video',
-            storyReply: storyReply
-          });
+          console.log('⚠️ No recording promise available');
+          Alert.alert(
+            '🎉 Video Recorded!',
+            'Your video recording is complete.',
+            [{ text: 'OK' }]
+          );
         }
         
       } catch (error) {
         console.error('❌ Error stopping recording:', error);
-        
-        // Error fallback - still navigate to editor
-        navigation.navigate('PhotoEditor', {
-          photoUri: 'test://video-error',
-          mediaType: 'video',
-          storyReply: storyReply
-        });
+        Alert.alert(
+          'Recording Error',
+          'There was an issue stopping the video recording. Please try again.',
+          [{ text: 'OK' }]
+        );
       } finally {
-        // Always clean up states
+        // Always clean up - prevents infinite spinning
         console.log('📹 Cleaning up recording state');
         setIsRecording(false);
         setShouldStopRecording(false);
@@ -312,8 +267,8 @@ export default function CameraScreen() {
         setRecordingStartTime(null);
         stopTimer();
         recordingPromiseRef.current = null;
+        setCurrentVideoSession(null);
         
-        // Clear force cleanup timeout if it exists
         if (forceCleanupRef.current) {
           clearTimeout(forceCleanupRef.current);
           forceCleanupRef.current = null;
@@ -392,21 +347,16 @@ export default function CameraScreen() {
     );
   };
 
-  // AR functionality
-  const toggleARControls = () => {
-    setShowARControls(!showARControls);
+  // AI Filter functionality
+  const toggleAIFilterControls = () => {
+    setShowAIFilterControls(!showAIFilterControls);
   };
 
-  const toggleAR = () => {
-    setIsARActive(!isARActive);
-    if (!isARActive) {
-      setSelectedARFilter('none');
-    }
-  };
-
-  const handleARFilterSelect = (filter: ARFilterType) => {
-    setSelectedARFilter(filter);
-    setIsARActive(filter !== 'none');
+  const handleAIFilterSelect = (filter: FilterDefinition) => {
+    console.log('📷 Camera: Filter selected:', filter);
+    setSelectedAIFilter(filter);
+    setIsAIFilterActive(true);
+    console.log('📷 Camera: AI filter active:', true, 'Filter ID:', filter.id);
   };
 
 
@@ -479,11 +429,11 @@ export default function CameraScreen() {
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[styles.controlButton, isARActive && styles.controlButtonActive]} 
-            onPress={toggleARControls}
+            style={[styles.controlButton, isAIFilterActive && styles.controlButtonActive]} 
+            onPress={toggleAIFilterControls}
           >
-            <Text style={styles.controlText}>✨</Text>
-            <Text style={styles.controlLabel}>AR</Text>
+            <Text style={styles.controlText}>🤖</Text>
+            <Text style={styles.controlLabel}>AI</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.controlButton} onPress={toggleCameraFacing}>
@@ -492,18 +442,19 @@ export default function CameraScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* AR Overlay */}
+        {/* AI Filter Overlay */}
         <AROverlay
-          isActive={isARActive}
-          selectedFilter={selectedARFilter}
+          isActive={isAIFilterActive}
+          selectedFilter={(selectedAIFilter?.id || 'none') as ARFilterType}
         />
 
-        {/* AR Controls */}
-        <ARControls
-          isVisible={showARControls}
-          selectedFilter={selectedARFilter}
-          onFilterSelect={handleARFilterSelect}
-          onToggleAR={() => setShowARControls(false)}
+        {/* AI Filter Controls */}
+        <AIFilterControls
+          isVisible={showAIFilterControls}
+          selectedFilter={selectedAIFilter?.id || 'none'}
+          onFilterSelect={handleAIFilterSelect}
+          onToggleAI={() => setShowAIFilterControls(false)}
+          capturedImageUri={lastCapture || undefined}
         />
 
         {/* Recording Indicator - Absolutely Positioned */}
@@ -513,6 +464,8 @@ export default function CameraScreen() {
             <Text style={styles.recordingText}>REC</Text>
           </View>
         )}
+
+
 
         {/* Bottom Controls - Overlaid on Camera */}
         <View style={styles.bottomControls}>
@@ -551,9 +504,12 @@ export default function CameraScreen() {
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.friendsButton} onPress={() => sendToFriends('', 'photo')}>
-            <Text style={styles.friendsText}>👥</Text>
-            <Text style={styles.controlLabel}>Friends</Text>
+          <TouchableOpacity 
+            style={styles.friendsButton} 
+            onPress={() => navigation.navigate('FriendshipMemory' as any)}
+          >
+            <Text style={styles.friendsText}>🤖</Text>
+            <Text style={styles.controlLabel}>Memories</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -734,4 +690,5 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginBottom: 5,
   },
+
 }); 

@@ -5,12 +5,41 @@ import { Platform } from 'react-native';
 import { User } from '../types';
 
 // Demo mode flag - matches App.tsx
-const DEMO_MODE = true;
+const DEMO_MODE = true; // Keep demo mode for auth
+const ENABLE_STORAGE = true; // But enable Firebase Storage for video uploads
 
-// Only import Firebase when not in demo mode
+// Firebase services
 let auth: any = null;
 let db: any = null;
+let storage: any = null;
 
+// Initialize Firebase Storage separately (for video uploads)
+if (ENABLE_STORAGE) {
+  try {
+    const { initializeApp } = require('firebase/app');
+    const { getStorage } = require('firebase/storage');
+
+    // Firebase config using environment variables
+    const firebaseConfig = {
+      apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "your-api-key",
+      authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "your-project.firebaseapp.com",
+      projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "your-project-id",
+      storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "your-project.appspot.com",
+      messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "123456789",
+      appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "your-app-id"
+    };
+
+    // Initialize Firebase app for Storage only
+    const app = initializeApp(firebaseConfig);
+    storage = getStorage(app);
+    console.log('🔥 Firebase Storage initialized successfully');
+  } catch (error) {
+    console.error('❌ Firebase Storage initialization failed:', error);
+    storage = null;
+  }
+}
+
+// Legacy Firebase initialization for auth/db (demo mode)
 if (!DEMO_MODE) {
   // Real Firebase imports (only when demo mode is disabled)
   const { initializeApp } = require('firebase/app');
@@ -27,14 +56,14 @@ if (!DEMO_MODE) {
     appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "your-app-id"
   };
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
+  // Initialize Firebase (excluding storage - handled above)
+  const legacyApp = initializeApp(firebaseConfig, 'legacy');
+  auth = getAuth(legacyApp);
+  db = getFirestore(legacyApp);
 }
 
 // Export Firebase services (will be null in demo mode)
-export { auth, db };
+export { auth, db, storage };
 
 // Demo authentication functions
 export const signInWithGoogle = async (): Promise<User> => {

@@ -14,6 +14,8 @@ export interface User {
   followers: number;
   following: number;
   isVerified: boolean;
+  avatarEmoji?: string; // Custom emoji for profile picture
+  streakEmoji?: string; // Custom emoji for streak display
   createdAt: Date;
   updatedAt: Date;
 }
@@ -213,6 +215,28 @@ export interface Notification {
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
+  ChatScreen: undefined;
+  PhotoEditor: {
+    photoUri: string;
+    mediaType: 'photo' | 'video';
+    storyReply?: {
+      storyUserId: string;
+      storyId: string;
+    };
+    videoSessionId?: string; // For AI-powered video management
+  };
+  ShareScreen: {
+    photoUri: string;
+    mediaType: 'photo' | 'video';
+    caption: string;
+    storyReply?: {
+      storyUserId: string;
+      storyId: string;
+    };
+  };
+  WorkoutSearchScreen: undefined;
+  FriendshipMemory: undefined;
+  Settings: undefined;
 };
 
 export type AuthStackParamList = {
@@ -239,6 +263,7 @@ export type MainTabParamList = {
       storyUserId: string;
       storyId: string;
     };
+    videoSessionId?: string; // For AI-powered video management
   };
   ShareScreen: {
     photoUri: string;
@@ -275,6 +300,22 @@ export interface OpenAIResponse {
   }[];
 }
 
+// Fitness Chat Types
+export interface FitnessChatMessage {
+  id: string;
+  text: string;
+  isUser: boolean;
+  timestamp: Date;
+  exercisesExtracted?: string[];
+  musclesWorked?: string[];
+}
+
+export interface WorkoutSession {
+  exercises: string[];
+  musclesWorked: string[];
+  date: Date;
+}
+
 // App Store Types
 export interface AppState {
   // User
@@ -301,6 +342,10 @@ export interface AppState {
   // Notifications
   notifications: Notification[];
   unreadCount: number;
+  
+  // Fitness Chat
+  fitnessMessages: FitnessChatMessage[];
+  currentWorkout: WorkoutSession;
 }
 
 // Action Types
@@ -310,6 +355,9 @@ export interface AppActions {
   setAuthenticated: (authenticated: boolean) => void;
   setLoading: (loading: boolean) => void;
   updateUser: (updates: Partial<User>) => void;
+  incrementSnapScore: (points?: number) => void;
+  loadPersistedUser: () => Promise<void>;
+  logoutSession: () => void;
   
   // Friends actions
   setFriends: (friends: Friend[]) => void;
@@ -336,4 +384,9 @@ export interface AppActions {
   markNotificationAsRead: (notificationId: string) => void;
   incrementUnreadCount: () => void;
   resetUnreadCount: () => void;
+  
+  // Fitness Chat actions
+  addFitnessMessage: (message: FitnessChatMessage) => void;
+  updateCurrentWorkout: (exercises: string[], muscles: string[]) => void;
+  clearFitnessChat: () => void;
 } 

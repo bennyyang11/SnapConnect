@@ -14,6 +14,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAppStore } from '../../store/useAppStore';
 import { signInWithGoogle, signInWithApple, signInWithEmailPassword } from '../../services/firebase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -207,29 +208,100 @@ export default function LoginScreen() {
                   { text: 'Cancel', style: 'cancel' },
                   { 
                     text: 'Continue as Demo', 
-                    onPress: () => {
-                      setUser({
-                        id: 'demo-user',
-                        email: 'demo@snapconnect.app',
-                        username: 'SnapDemo',
-                        displayName: 'Demo User',
-                        bio: 'Exploring SnapConnect! 🎉',
-                        snapScore: 15420,
-                        bestFriends: ['john_doe', 'sarah_wilson'],
-                        blockedUsers: [],
-                        privacySettings: {
-                          whoCanContactMe: 'friends',
-                          whoCanSeeMyStory: 'friends',
-                          whoCanSeeMyLocation: 'nobody',
-                          showMeInQuickAdd: true,
-                        },
-                        followers: 1250,
-                        following: 890,
-                        isVerified: true,
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
-                      });
-                      setAuthenticated(true);
+                    onPress: async () => {
+                      try {
+                        console.log('🔐 LOGIN: Demo login started...');
+                        // Check if there's already a persisted demo user
+                        console.log('🔐 LOGIN: Checking AsyncStorage for existing user...');
+                        
+                        // Debug: Show all AsyncStorage keys
+                        try {
+                          const allKeys = await AsyncStorage.getAllKeys();
+                          console.log('🔐 LOGIN: All AsyncStorage keys:', allKeys);
+                        } catch (e) {
+                          console.log('🔐 LOGIN: Could not get AsyncStorage keys');
+                        }
+                        
+                        const persistedUserData = await AsyncStorage.getItem('@snapconnect_user_data');
+                        console.log('🔐 LOGIN: Raw data from AsyncStorage:', persistedUserData ? 'Found data' : 'No data');
+                        
+                        if (persistedUserData) {
+                          // Use existing persisted user data (preserves snap score!)
+                          console.log('🔐 LOGIN: Found existing user data in AsyncStorage');
+                          const existingUser = JSON.parse(persistedUserData);
+                          console.log('🔄 LOGIN: Parsed existing user - Snap Score:', existingUser.snapScore, 'User ID:', existingUser.id);
+                          const restoredUser = {
+                            ...existingUser,
+                            createdAt: new Date(existingUser.createdAt),
+                            updatedAt: new Date(existingUser.updatedAt),
+                          };
+                          console.log('🔐 LOGIN: Calling setUser with existing data...');
+                          setUser(restoredUser);
+                          console.log('✅ LOGIN: Successfully restored existing user');
+                        } else {
+                          // Create new demo user only if none exists - start with 0 snap score
+                          console.log('🔐 LOGIN: No existing user found, creating new demo user');
+                          console.log('✨ LOGIN: Creating brand new demo user with 0 snap score');
+                          const demoUser = {
+                            id: 'demo-user',
+                            email: 'demo@snapconnect.app',
+                            username: 'SnapDemo',
+                            displayName: 'Demo User',
+                            bio: 'Exploring SnapConnect! 🎉',
+                            snapScore: 0, // Start with 0, will grow with activity
+                            bestFriends: ['john_doe', 'sarah_wilson'],
+                            blockedUsers: [],
+                            privacySettings: {
+                              whoCanContactMe: 'friends' as const,
+                              whoCanSeeMyStory: 'friends' as const,
+                              whoCanSeeMyLocation: 'nobody' as const,
+                              showMeInQuickAdd: true,
+                            },
+                            followers: 1250,
+                            following: 890,
+                            isVerified: true,
+                            avatarEmoji: '😎', // Default avatar
+                            streakEmoji: '🔥', // Default streak emoji
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                          };
+                          console.log('🔐 LOGIN: Calling setUser with new demo user...');
+                          setUser(demoUser); // This will persist to AsyncStorage
+                          console.log('✅ LOGIN: New demo user created and saved');
+                        }
+                        
+                        console.log('🔐 LOGIN: Setting authenticated to true...');
+                        setAuthenticated(true);
+                        console.log('✅ LOGIN: Login process complete!');
+                      } catch (error) {
+                        console.error('Error loading demo user:', error);
+                        // Fallback to creating new user if there's an error
+                        const demoUser = {
+                          id: 'demo-user',
+                          email: 'demo@snapconnect.app',
+                          username: 'SnapDemo',
+                          displayName: 'Demo User',
+                          bio: 'Exploring SnapConnect! 🎉',
+                          snapScore: 0, // Start with 0 on error fallback too
+                          bestFriends: ['john_doe', 'sarah_wilson'],
+                          blockedUsers: [],
+                          privacySettings: {
+                            whoCanContactMe: 'friends' as const,
+                            whoCanSeeMyStory: 'friends' as const,
+                            whoCanSeeMyLocation: 'nobody' as const,
+                            showMeInQuickAdd: true,
+                          },
+                          followers: 1250,
+                          following: 890,
+                          isVerified: true,
+                          avatarEmoji: '😎',
+                          streakEmoji: '🔥',
+                          createdAt: new Date(),
+                          updatedAt: new Date(),
+                        };
+                        setUser(demoUser);
+                        setAuthenticated(true);
+                      }
                     }
                   }
                 ]

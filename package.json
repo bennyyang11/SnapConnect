@@ -9,6 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@pinecone-database/pinecone": "^6.1.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-google-signin/google-signin": "^15.0.0",
     "@react-navigation/bottom-tabs": "^7.4.1",
@@ -19,10 +20,12 @@
     "expo-asset": "^11.1.5",
     "expo-av": "^15.1.6",
     "expo-camera": "^16.1.8",
+    "expo-dev-client": "~5.2.1",
     "expo-image-picker": "^16.1.4",
     "expo-media-library": "^17.1.7",
     "expo-status-bar": "~2.2.3",
     "firebase": "^11.9.1",
+    "langchain": "^0.3.29",
     "nativewind": "^4.1.23",
     "openai": "^5.6.0",
     "react": "19.0.0",

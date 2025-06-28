@@ -1,13 +1,14 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../types';
 
 // Import screens (we'll create these next)
 import CameraScreen from '../screens/main/CameraScreen';
-import FeedScreen from '../screens/main/FeedScreen';
+import ChatScreen from '../screens/main/ChatScreen';
+import StoriesScreen from '../screens/main/StoriesScreen';
 import DiscoverScreen from '../screens/main/DiscoverScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
-import AIAssistantScreen from '../screens/main/AIAssistantScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -19,26 +20,50 @@ export default function MainNavigator() {
         tabBarStyle: {
           backgroundColor: '#161618',
           borderTopColor: '#424242',
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 80,
+          borderTopWidth: 1,
+          paddingBottom: Platform.OS === 'ios' ? 12 : 16,
+          paddingTop: 6,
+          paddingHorizontal: 2,
+          height: Platform.OS === 'ios' ? 85 : 90,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarActiveTintColor: '#FFDD3A',
         tabBarInactiveTintColor: '#9E9E9E',
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '600',
+          marginTop: 2,
+          marginBottom: 4,
+          letterSpacing: 0.1,
+          textAlign: 'center',
+        },
+        tabBarIconStyle: {
+          marginBottom: 1,
+          marginTop: 4,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 3,
+          paddingHorizontal: 2,
+          height: Platform.OS === 'ios' ? 65 : 70,
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexDirection: 'column',
+        },
       }}
     >
       <Tab.Screen 
-        name="Feed" 
-        component={FeedScreen}
+        name="Chat" 
+        component={ChatScreen}
         options={{
-          tabBarLabel: 'Feed',
+          tabBarLabel: 'Chat',
         }}
       />
       <Tab.Screen 
-        name="Discover" 
-        component={DiscoverScreen}
+        name="Stories" 
+        component={StoriesScreen}
         options={{
-          tabBarLabel: 'Discover',
+          tabBarLabel: 'Stories',
         }}
       />
       <Tab.Screen 
@@ -49,10 +74,10 @@ export default function MainNavigator() {
         }}
       />
       <Tab.Screen 
-        name="AIAssistant" 
-        component={AIAssistantScreen}
+        name="Discover" 
+        component={DiscoverScreen}
         options={{
-          tabBarLabel: 'AI Assistant',
+          tabBarLabel: 'Discover',
         }}
       />
       <Tab.Screen 
