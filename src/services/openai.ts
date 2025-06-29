@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { RAGContext, ContentSuggestion, PersonalBrand } from '../types';
+import * as FileSystem from 'expo-file-system';
 
 // OpenAI API key from environment variables
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || '';
@@ -346,14 +347,21 @@ export const generateCaption = async (imageUri: string, prompt: string): Promise
   }
 
   try {
+    console.log('🤖 generateCaption: Processing image URI:', imageUri);
+    
+    // Convert local file URI to base64 if needed
+    const processedImageUri = await convertLocalImageToBase64(imageUri);
+    
+    console.log('🤖 generateCaption: Calling OpenAI Vision API with processed URI');
+    
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-vision-preview',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'user',
           content: [
             { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: imageUri } }
+            { type: 'image_url', image_url: { url: processedImageUri } }
           ]
         }
       ],
@@ -374,14 +382,21 @@ export const analyzeImage = async (imageUri: string, prompt: string): Promise<st
   }
 
   try {
+    console.log('🔍 analyzeImage: Processing image URI:', imageUri);
+    
+    // Convert local file URI to base64 if needed
+    const processedImageUri = await convertLocalImageToBase64(imageUri);
+    
+    console.log('🔍 analyzeImage: Calling OpenAI Vision API with processed URI');
+    
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-vision-preview',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'user',
           content: [
             { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: imageUri } }
+            { type: 'image_url', image_url: { url: processedImageUri } }
           ]
         }
       ],
@@ -393,6 +408,33 @@ export const analyzeImage = async (imageUri: string, prompt: string): Promise<st
   } catch (error) {
     console.error('Error analyzing image:', error);
     return '{"mood":"unknown","objects":[],"colors":[],"tags":[]}';
+  }
+};
+
+// Helper function to convert local file URI to base64 data URL
+const convertLocalImageToBase64 = async (imageUri: string): Promise<string> => {
+  try {
+    if (!imageUri.startsWith('file://')) {
+      // If it's already a HTTP URL, return as is
+      return imageUri;
+    }
+    
+    console.log('🔄 Converting local image to base64...');
+    
+    // Read the file as base64
+    const base64 = await FileSystem.readAsStringAsync(imageUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    
+    // Create data URL with proper MIME type
+    const dataUrl = `data:image/jpeg;base64,${base64}`;
+    
+    console.log('✅ Successfully converted to base64 (length:', base64.length, 'chars)');
+    return dataUrl;
+    
+  } catch (error) {
+    console.error('❌ Failed to convert image to base64:', error);
+    throw new Error('Could not process image file. Please try again.');
   }
 };
 

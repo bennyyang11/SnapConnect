@@ -50,20 +50,55 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwn, showTime 
         )}
         
         {message.type === 'image' && (
-          <View style={styles.snapContainer}>
-            <Text style={styles.snapEmoji}>🖼️</Text>
-            <Text style={[styles.snapText, isOwn ? styles.ownText : styles.otherText]}>
-              Photo
-            </Text>
+          <View style={styles.imageContainer}>
+            {message.mediaUrl ? (
+              <Image 
+                source={{ uri: message.mediaUrl }} 
+                style={styles.messageImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.snapContainer}>
+                <Text style={styles.snapEmoji}>🖼️</Text>
+                <Text style={[styles.snapText, isOwn ? styles.ownText : styles.otherText]}>
+                  Photo
+                </Text>
+              </View>
+            )}
+            {message.content && message.content !== 'Photo snap' && (
+              <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText, styles.captionText]}>
+                {message.content}
+              </Text>
+            )}
           </View>
         )}
         
         {message.type === 'video' && (
-          <View style={styles.snapContainer}>
-            <Text style={styles.snapEmoji}>🎥</Text>
-            <Text style={[styles.snapText, isOwn ? styles.ownText : styles.otherText]}>
-              Video
-            </Text>
+          <View style={styles.videoContainer}>
+            {message.mediaUrl ? (
+              <View style={styles.videoWrapper}>
+                <Image 
+                  source={{ uri: message.mediaUrl }} 
+                  style={styles.messageVideo}
+                  resizeMode="cover"
+                />
+                <View style={styles.videoPlayOverlay}>
+                  <Text style={styles.videoPlayIcon}>▶️</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.snapContainer}>
+                <Text style={styles.snapEmoji}>🎥</Text>
+                <Text style={[styles.snapText, isOwn ? styles.ownText : styles.otherText]}>
+                  Video
+                </Text>
+              </View>
+            )}
+            {message.content && message.content !== 'Video snap' && (
+              <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText, styles.captionText]}>
+                {message.content}
+              </Text>
+            )}
           </View>
         )}
 
@@ -357,6 +392,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#424242',
     backgroundColor: '#161618',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   backButton: {
     paddingVertical: 5,
@@ -387,6 +430,14 @@ const styles = StyleSheet.create({
     borderRadius: 17.5,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   snapHeaderText: {
     fontSize: 18,
@@ -416,6 +467,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     maxWidth: '100%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   ownBubble: {
     backgroundColor: '#FFDD3A',
@@ -457,6 +516,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#161618',
     borderTopWidth: 1,
     borderTopColor: '#424242',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   inputRow: {
     flexDirection: 'row',
@@ -472,6 +539,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   snapButtonText: {
     fontSize: 20,
@@ -487,11 +562,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     maxHeight: 100,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   sendButton: {
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   sendButtonActive: {
     backgroundColor: '#FFDD3A',
@@ -553,5 +644,57 @@ const styles = StyleSheet.create({
   storyReplyText: {
     fontSize: 16,
     lineHeight: 20,
+  },
+  imageContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  messageImage: {
+    width: 160,
+    height: 200,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  videoContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  videoWrapper: {
+    position: 'relative',
+    width: 160,
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  messageVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  videoPlayOverlay: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -12 }, { translateY: -12 }],
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayIcon: {
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+  captionText: {
+    fontSize: 12,
+    marginTop: 4,
   },
 }); 

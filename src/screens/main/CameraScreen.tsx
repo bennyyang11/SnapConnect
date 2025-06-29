@@ -26,6 +26,7 @@ import { MainTabParamList, RootStackParamList } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { videoManager } from '../../services/videoManager';
+import ImageProcessingService from '../../services/imageProcessingService';
 
 
 const { width, height } = Dimensions.get('window');
@@ -124,20 +125,43 @@ export default function CameraScreen() {
         });
         
         if (photo) {
-          // Save to device gallery
-          if (mediaLibraryPermission?.granted) {
-            await MediaLibrary.saveToLibraryAsync(photo.uri);
+          let processedPhotoUri = photo.uri;
+          
+          // Apply AI filter if one is selected
+          if (isAIFilterActive && selectedAIFilter) {
+            try {
+              console.log('🎨 Applying AI filter to captured photo...', selectedAIFilter.name || selectedAIFilter);
+              processedPhotoUri = await ImageProcessingService.applyFilterToImage(photo.uri, selectedAIFilter);
+              console.log('✅ AI filter applied to photo');
+            } catch (filterError) {
+              console.error('❌ Failed to apply filter:', filterError);
+              // Continue with original photo if filter fails
+            }
           }
           
-          setLastCapture(photo.uri);
+          // Save to device gallery
+          if (mediaLibraryPermission?.granted) {
+            await MediaLibrary.saveToLibraryAsync(processedPhotoUri);
+          }
           
+          setLastCapture(processedPhotoUri);
 
+          // Show success message if filter was applied
+          if (isAIFilterActive && selectedAIFilter) {
+            const filterName = typeof selectedAIFilter === 'string' ? 'AI Filter' : selectedAIFilter.name;
+            Alert.alert(
+              '🎨 Filter Applied!',
+              `Your photo has been captured with the ${filterName} filter! Color effects will be visible in the photo editor.`,
+              [{ text: 'Continue to Editor', style: 'default' }]
+            );
+          }
           
           // Navigate to PhotoEditor for editing
           navigation.navigate('PhotoEditor', {
-            photoUri: photo.uri,
+            photoUri: processedPhotoUri,
             mediaType: 'photo',
             storyReply: route.params?.storyReply,
+            appliedFilter: isAIFilterActive && selectedAIFilter ? selectedAIFilter : undefined,
           });
         }
       } catch (error) {

@@ -109,10 +109,8 @@ export class FriendshipMemoryService {
 
       this.snapHistory.push(snap);
 
-      // Generate and store caption embedding if caption exists
-      if (snap.caption) {
-        await this.generateCaptionEmbedding(snap);
-      }
+      // Always generate and store embedding for better searchability
+      await this.generateCaptionEmbedding(snap);
 
       // Update friendship stats for both directions
       await this.updateFriendshipStats(senderId, recipientId, snap);
@@ -122,6 +120,8 @@ export class FriendshipMemoryService {
       await this.analyzeSharedMoments(senderId, recipientId);
 
       console.log(`✅ Friendship snap tracked successfully`);
+      console.log(`📊 Total snaps in history: ${this.snapHistory.length}`);
+      console.log(`📊 Total embeddings: ${this.captionEmbeddings.length}`);
 
     } catch (error) {
       console.error('❌ Error tracking friendship snap:', error);
@@ -132,14 +132,22 @@ export class FriendshipMemoryService {
    * Generate embedding for snap caption using OpenAI
    */
   private static async generateCaptionEmbedding(snap: SnapMetadata): Promise<void> {
-    if (!OPENAI_API_KEY || !snap.caption) return;
+    if (!OPENAI_API_KEY) return;
 
     try {
-      console.log('🧠 Generating caption embedding...');
+      // Create a comprehensive text representation of the snap for embedding
+      const textContent = this.createSearchableText(snap);
+      
+      if (!textContent.trim()) {
+        console.log('⚠️ No searchable content for snap:', snap.id);
+        return;
+      }
+
+      console.log('🧠 Generating caption embedding for:', textContent.slice(0, 50) + '...');
 
       const response = await openai.embeddings.create({
         model: 'text-embedding-ada-002',
-        input: snap.caption,
+        input: textContent,
       });
 
       const embedding: CaptionEmbedding = {
@@ -147,7 +155,7 @@ export class FriendshipMemoryService {
         snapId: snap.id,
         userId: snap.senderId,
         friendId: snap.recipientId,
-        caption: snap.caption,
+        caption: textContent, // Store the full searchable text
         embedding: response.data[0].embedding,
         metadata: {
           mood: snap.mood,
@@ -163,6 +171,59 @@ export class FriendshipMemoryService {
     } catch (error) {
       console.error('❌ Error generating caption embedding:', error);
     }
+  }
+
+  /**
+   * Create comprehensive searchable text from snap data
+   */
+  private static createSearchableText(snap: SnapMetadata): string {
+    const textParts: string[] = [];
+
+    // Add caption if available
+    if (snap.caption && snap.caption.trim()) {
+      textParts.push(snap.caption.trim());
+    }
+
+    // Add tags
+    if (snap.tags && snap.tags.length > 0) {
+      textParts.push(snap.tags.join(' '));
+    }
+
+    // Add mood
+    if (snap.mood) {
+      textParts.push(`feeling ${snap.mood}`);
+    }
+
+    // Add location context
+    if (snap.location?.address) {
+      textParts.push(`at ${snap.location.address}`);
+    }
+
+    // Add media type context
+    if (snap.imageUri) {
+      textParts.push('photo picture image');
+    }
+    if (snap.videoUri) {
+      textParts.push('video clip recording');
+    }
+
+    // Add filter context
+    if (snap.filterUsed && snap.filterUsed !== 'none') {
+      textParts.push(`with ${snap.filterUsed} filter`);
+    }
+
+    // Add time context
+    const hour = snap.timestamp.getHours();
+    if (hour < 6) textParts.push('late night early morning');
+    else if (hour < 12) textParts.push('morning');
+    else if (hour < 18) textParts.push('afternoon');
+    else textParts.push('evening');
+
+    // Add day context
+    const dayOfWeek = snap.timestamp.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    textParts.push(dayOfWeek);
+
+    return textParts.join(' ');
   }
 
   /**
@@ -492,7 +553,10 @@ Return as JSON array: ["insight1", "insight2", "insight3"]`;
    * Search similar moments using caption embeddings
    */
   static async searchSimilarMoments(query: string, userId: string, friendId?: string): Promise<SharedMoment[]> {
-    if (!OPENAI_API_KEY) return [];
+    if (!OPENAI_API_KEY) {
+      console.log('⚠️ OpenAI API key not configured, falling back to basic search');
+      return this.basicTextSearch(query, userId, friendId);
+    }
 
     try {
       console.log('🔍 Searching similar moments for:', query);
@@ -516,24 +580,152 @@ Return as JSON array: ["insight1", "insight2", "insight3"]`;
           similarity: this.cosineSimilarity(queryEmbedding, embed.embedding)
         }))
         .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, 10);
+        .slice(0, 20); // Get more results
 
-      // Find moments containing these similar snaps
-      const relevantSnapIds = similarities.map(s => s.embed.snapId);
-      const timeline = friendId ? this.getFriendshipTimeline(userId, friendId) : null;
-      
-      if (timeline) {
-        return timeline.moments.filter(moment => 
-          moment.snaps.some(snap => relevantSnapIds.includes(snap.id))
-        );
+      console.log(`📊 Found ${similarities.length} similar captions`);
+
+      // If we have good embedding matches, use them
+      if (similarities.length > 0 && similarities[0].similarity > 0.7) {
+        const relevantSnapIds = similarities.map(s => s.embed.snapId);
+        const moments = this.findMomentsContainingSnaps(relevantSnapIds, userId, friendId);
+        
+        if (moments.length > 0) {
+          console.log(`✅ Found ${moments.length} moments with similar content`);
+          return moments;
+        }
       }
 
-      return [];
+      // If no good embedding matches, fall back to text search
+      console.log('🔄 Falling back to basic text search');
+      return this.basicTextSearch(query, userId, friendId);
 
     } catch (error) {
       console.error('❌ Error searching similar moments:', error);
-      return [];
+      // Fall back to basic text search on error
+      return this.basicTextSearch(query, userId, friendId);
     }
+  }
+
+  /**
+   * Basic text search as fallback when embeddings aren't available
+   */
+  private static basicTextSearch(query: string, userId: string, friendId?: string): SharedMoment[] {
+    console.log('🔍 Performing basic text search for:', query);
+    
+    const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 2);
+    const results: Array<{ moment: SharedMoment; score: number }> = [];
+
+    // Search through all snaps first
+    const relevantSnaps = this.snapHistory.filter(snap => 
+      snap.senderId === userId && 
+      (!friendId || snap.recipientId === friendId)
+    );
+
+    console.log(`📊 Searching through ${relevantSnaps.length} snaps`);
+
+    // Create temporary moments from individual snaps if they match
+    const individualMatches: SharedMoment[] = [];
+    
+    relevantSnaps.forEach(snap => {
+      let score = 0;
+      const searchText = [
+        snap.caption || '',
+        ...(snap.tags || []),
+        snap.mood || '',
+        snap.location?.address || ''
+      ].join(' ').toLowerCase();
+
+      queryWords.forEach(word => {
+        if (searchText.includes(word)) {
+          score += 1;
+        }
+      });
+
+      // If we have a decent match, create a temporary moment for this snap
+      if (score > 0) {
+        const tempMoment: SharedMoment = {
+          id: `temp_moment_${snap.id}`,
+          participants: [snap.senderId, snap.recipientId],
+          snaps: [snap],
+          theme: 'Individual Memory',
+          mood: snap.mood || 'neutral',
+          significance: Math.min(score * 0.3, 1.0),
+          summary: snap.caption || `${snap.imageUri ? 'Photo' : 'Video'} snap`,
+          highlightCaption: snap.caption || 'Shared moment',
+          timestamp: snap.timestamp,
+          location: snap.location?.address,
+          tags: snap.tags || []
+        };
+        
+        individualMatches.push(tempMoment);
+      }
+    });
+
+    // Also search through existing moments
+    const allTimelines = Array.from(this.friendshipTimelines.values())
+      .filter(timeline => !friendId || timeline.friendId === friendId);
+
+    allTimelines.forEach(timeline => {
+      timeline.moments.forEach(moment => {
+        let score = 0;
+        const searchText = [
+          moment.summary,
+          moment.highlightCaption,
+          moment.theme,
+          moment.mood,
+          ...moment.tags,
+          ...moment.snaps.map(s => s.caption || '').join(' ')
+        ].join(' ').toLowerCase();
+
+        queryWords.forEach(word => {
+          if (searchText.includes(word)) {
+            score += 1;
+          }
+        });
+
+        if (score > 0) {
+          results.push({ moment, score });
+        }
+      });
+    });
+
+    // Combine individual matches with moment matches
+    const allResults = [
+      ...individualMatches.map(moment => ({ moment, score: moment.significance })),
+      ...results
+    ];
+
+    // Sort by score and return top results
+    const sortedResults = allResults
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map(r => r.moment);
+
+    console.log(`✅ Basic search found ${sortedResults.length} results`);
+    return sortedResults;
+  }
+
+  /**
+   * Find moments that contain specific snap IDs
+   */
+  private static findMomentsContainingSnaps(snapIds: string[], userId: string, friendId?: string): SharedMoment[] {
+    const moments: SharedMoment[] = [];
+    
+    const timelines = friendId 
+      ? [this.getFriendshipTimeline(userId, friendId)].filter(Boolean) as FriendshipTimeline[]
+      : Array.from(this.friendshipTimelines.values()).filter(t => 
+          t.moments.some(m => m.participants.includes(userId))
+        );
+
+    timelines.forEach(timeline => {
+      timeline.moments.forEach(moment => {
+        if (moment.snaps.some(snap => snapIds.includes(snap.id))) {
+          moments.push(moment);
+        }
+      });
+    });
+
+    return moments;
   }
 
   /**

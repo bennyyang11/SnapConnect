@@ -5,12 +5,16 @@ export interface UserInteraction {
   id: string;
   userId: string;
   contentId: string;
-  action: 'view' | 'like' | 'save' | 'share' | 'click';
+  action: 'view' | 'like' | 'save' | 'share' | 'click' | 'search';
   timestamp: Date;
   metadata?: {
     duration?: number;
     scrollDepth?: number;
     source?: string;
+    searchQuery?: string;
+    contentTitle?: string;
+    contentTags?: string[];
+    contentCategory?: string;
   };
 }
 
@@ -49,7 +53,12 @@ export class UserInteractionService {
         contentId,
         action,
         timestamp: new Date(),
-        metadata
+        metadata: {
+          ...metadata,
+          contentTitle: content?.title || '',
+          contentTags: Array.isArray(content?.tags) ? content.tags : [],
+          contentCategory: content?.category || '',
+        }
       };
 
       this.interactions.push(interaction);
@@ -59,6 +68,54 @@ export class UserInteractionService {
 
     } catch (error) {
       console.error('❌ Error tracking interaction:', error);
+    }
+  }
+
+  /**
+   * Track a search query separately for better personalization
+   */
+  static async trackSearchQuery(
+    userId: string,
+    searchQuery: string,
+    resultCount: number = 0
+  ): Promise<void> {
+    try {
+      console.log(`🔍 Tracking search query for user ${userId}: "${searchQuery}"`);
+
+      const interaction: UserInteraction = {
+        id: `search_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        userId,
+        contentId: `search_${searchQuery.replace(/\s+/g, '_')}`,
+        action: 'search',
+        timestamp: new Date(),
+        metadata: {
+          searchQuery,
+          source: 'discover_search',
+          duration: resultCount
+        }
+      };
+
+      this.interactions.push(interaction);
+
+      // Update user profile with search interests
+      const profile = this.getUserProfile(userId);
+      const searchTerms = searchQuery.toLowerCase().split(' ').filter(term => term.length > 2);
+      
+      searchTerms.forEach(term => {
+        if (!profile.preferences.interests.includes(term)) {
+          profile.preferences.interests.push(term);
+        }
+      });
+
+      // Keep only the most recent 20 interests
+      profile.preferences.interests = profile.preferences.interests.slice(-20);
+      profile.lastUpdated = new Date();
+      this.userProfiles.set(userId, profile);
+
+      console.log(`✅ Tracked search query successfully`);
+
+    } catch (error) {
+      console.error('❌ Error tracking search query:', error);
     }
   }
 
@@ -192,7 +249,7 @@ Provide encouraging fitness insights (100 words max):`;
       : 1;
 
     const engagementScore = interactions.reduce((score, interaction) => {
-      const weights = { 'view': 1, 'click': 1.2, 'like': 2, 'save': 3, 'share': 4 };
+      const weights = { 'view': 1, 'click': 1.2, 'like': 2, 'save': 3, 'share': 4, 'search': 1.5 };
       return score + (weights[interaction.action] || 1);
     }, 0) / interactions.length || 0;
 
@@ -202,6 +259,42 @@ Provide encouraging fitness insights (100 words max):`;
       topCategories: profile.personalityInsights.topCategories.slice(0, 3),
       engagementScore: Math.round(engagementScore * 10) / 10
     };
+  }
+
+  /**
+   * Get meaningful content topics from user interactions
+   */
+  static getUserContentInterests(userId: string, limit: number = 10): string[] {
+    const interactions = this.getUserInteractions(userId);
+    const interests: string[] = [];
+
+    // Collect search queries
+    interactions
+      .filter(i => i.action === 'search' && i.metadata?.searchQuery)
+      .forEach(i => interests.push(i.metadata?.searchQuery || ''));
+
+    // Collect content titles
+    interactions
+      .filter(i => i.action === 'view' && i.metadata?.contentTitle)
+      .forEach(i => interests.push(i.metadata?.contentTitle || ''));
+
+    // Collect content tags
+    interactions
+      .filter(i => i.metadata?.contentTags && Array.isArray(i.metadata.contentTags))
+      .forEach(i => {
+        const tags = i.metadata?.contentTags || [];
+        if (tags.length > 0) {
+          interests.push(...tags);
+        }
+      });
+
+    // Return unique, most recent interests
+    const uniqueInterests = [...new Set(interests)]
+      .filter(interest => interest.length > 0)
+      .reverse()
+      .slice(0, limit);
+
+    return uniqueInterests;
   }
 }
 

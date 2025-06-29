@@ -152,26 +152,31 @@ ${options.equipment ? `Equipment: ${options.equipment.join(', ')}` : ''}`;
    */
   static async generatePersonalizedRecommendations(
     userPreferences: UserPreference,
-    interactionHistory: string[],
+    userContentInterests: string[],
     limit: number = 10
   ): Promise<FitnessContent[]> {
     try {
       console.log('🎯 Generating personalized recommendations...');
+      console.log('📊 User interests count:', userContentInterests.length);
 
-      // Analyze user preferences (token-optimized)
-      const analysisPrompt = `User fitness profile:
+      // Create a more detailed analysis prompt using actual user interests
+      const analysisPrompt = `User fitness profile and interests:
 Categories: ${userPreferences.categories.join(', ')}
-Types: ${userPreferences.contentTypes.join(', ')}
-Level: ${userPreferences.difficultyLevel}
-Interests: ${userPreferences.interests.join(', ')}
-Recent: ${interactionHistory.slice(-5).join(', ')}
+Content Types: ${userPreferences.contentTypes.join(', ')}
+Difficulty Level: ${userPreferences.difficultyLevel}
+Recent Interests: ${userContentInterests.slice(0, 8).join(', ')}
+Saved Interests: ${userPreferences.interests.join(', ')}
 
-Suggest ${limit} relevant fitness topics (comma-separated):`;
+Based on their search history and viewed content, suggest ${limit} highly relevant fitness topics that would interest this user. Focus on their recent searches and content they've engaged with.
+
+Provide topics as a comma-separated list:`;
 
       const analysisResult = await callLangChain(analysisPrompt, 'recommendation_engine');
       
       if (!analysisResult.response) {
-        return await this.generateTrendingContent(limit);
+        // If AI fails, use user interests directly as topics
+        const fallbackTopics = userContentInterests.slice(0, limit);
+        return await this.generateContentFromTopics(fallbackTopics, userPreferences);
       }
 
       // Parse recommended topics
@@ -181,28 +186,126 @@ Suggest ${limit} relevant fitness topics (comma-separated):`;
         .filter(topic => topic.length > 0)
         .slice(0, limit);
 
-      // Generate content for each recommended topic
-      const recommendations: FitnessContent[] = [];
-      
-      for (const topic of recommendedTopics) {
-        const contentType = this.selectOptimalContentType(userPreferences.contentTypes);
-        const content = await this.generateFitnessContent(contentType, topic, {
-          difficulty: userPreferences.difficultyLevel,
-          duration: this.selectOptimalDuration(userPreferences)
-        });
-        
-        if (content) {
-          recommendations.push(content);
-        }
+      console.log('🤖 AI recommended topics:', recommendedTopics);
+
+      // If we have user interests but AI didn't provide good topics, use user interests
+      if (recommendedTopics.length < 3 && userContentInterests.length > 0) {
+        const userTopics = userContentInterests.slice(0, limit);
+        return await this.generateContentFromTopics(userTopics, userPreferences);
       }
 
-      console.log(`✅ Generated ${recommendations.length} personalized recommendations`);
-      return recommendations;
+      // Generate content for each recommended topic
+      return await this.generateContentFromTopics(recommendedTopics, userPreferences);
 
     } catch (error) {
       console.error('❌ Error generating recommendations:', error);
+      
+      // Fallback: try to use user interests directly
+      if (userContentInterests.length > 0) {
+        console.log('🔄 Fallback: generating content from user interests');
+        return await this.generateContentFromTopics(userContentInterests.slice(0, limit), userPreferences);
+      }
+      
       return await this.generateTrendingContent(limit);
     }
+  }
+
+  /**
+   * Generate content from a list of topics
+   */
+  private static async generateContentFromTopics(
+    topics: string[],
+    userPreferences: UserPreference
+  ): Promise<FitnessContent[]> {
+    const recommendations: FitnessContent[] = [];
+    
+    for (const topic of topics) {
+      if (!topic || topic.length === 0) continue;
+      
+      const contentType = this.selectOptimalContentType(userPreferences.contentTypes);
+      const content = await this.generateFitnessContent(contentType, topic, {
+        difficulty: userPreferences.difficultyLevel,
+        duration: this.selectOptimalDuration(userPreferences)
+      });
+      
+      if (content) {
+        recommendations.push(content);
+      }
+    }
+
+    console.log(`✅ Generated ${recommendations.length} personalized recommendations from topics`);
+    return recommendations;
+  }
+
+  /**
+   * Generate multiple related articles for a search query
+   */
+  static async generateMultipleSearchResults(
+    searchQuery: string,
+    limit: number = 5
+  ): Promise<FitnessContent[]> {
+    console.log(`🔍 Generating ${limit} articles for search: "${searchQuery}"`);
+
+    const searchResults: FitnessContent[] = [];
+    const contentTypes: FitnessContent['type'][] = ['article', 'tip', 'workout_plan', 'recipe'];
+    
+    // Generate different variations of the search topic
+    const topicVariations = [
+      `${searchQuery} for beginners`,
+      `Advanced ${searchQuery} techniques`,
+      `${searchQuery} benefits and effects`,
+      `How to use ${searchQuery} properly`,
+      `${searchQuery} dosage and timing`,
+      `Best ${searchQuery} supplements`,
+      `${searchQuery} vs alternatives`,
+      `Complete guide to ${searchQuery}`,
+      `${searchQuery} side effects and safety`,
+      `${searchQuery} research and studies`
+    ].slice(0, limit);
+
+    try {
+      // Generate content for each variation with timeout
+      const promises = topicVariations.map(async (topic, index) => {
+        const contentType = contentTypes[index % contentTypes.length];
+        console.log(`🎯 Generating ${contentType} for: ${topic}`);
+        
+        const timeoutPromise = new Promise<FitnessContent | null>((_, reject) => 
+          setTimeout(() => reject(new Error('Search content generation timeout')), 8000)
+        );
+        
+        const contentPromise = this.generateFitnessContent(contentType, topic);
+        
+        try {
+          const content = await Promise.race([contentPromise, timeoutPromise]);
+          if (content) {
+            content.engagementScore = Math.random() * 0.3 + 0.7;
+            content.viewCount = Math.floor(Math.random() * 25000) + 5000;
+            return content;
+          }
+        } catch (error) {
+          console.log(`⚠️ Failed to generate search content for: ${topic}`, error instanceof Error ? error.message : 'Unknown error');
+          return null;
+        }
+        return null;
+      });
+
+      const results = await Promise.allSettled(promises);
+      
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value) {
+          searchResults.push(result.value);
+        } else {
+          console.log(`❌ Search content generation failed for topic ${index}:`, result.status === 'rejected' ? result.reason : 'No content returned');
+        }
+      });
+
+      console.log(`✅ Generated ${searchResults.length} out of ${limit} search results for "${searchQuery}"`);
+      
+    } catch (error) {
+      console.error('❌ Error in search content generation:', error);
+    }
+
+    return searchResults;
   }
 
   /**
@@ -324,7 +427,10 @@ Suggest ${limit} relevant fitness topics (comma-separated):`;
     
     if (lowerTopic.includes('nutrition') || lowerTopic.includes('diet') || lowerTopic.includes('meal')) {
       return 'Nutrition & Diet';
-    } else if (lowerTopic.includes('supplement') || lowerTopic.includes('protein')) {
+    } else if (lowerTopic.includes('supplement') || lowerTopic.includes('protein') || 
+               lowerTopic.includes('creatine') || lowerTopic.includes('whey') || 
+               lowerTopic.includes('bcaa') || lowerTopic.includes('pre-workout') ||
+               lowerTopic.includes('vitamin') || lowerTopic.includes('powder')) {
       return 'Supplements';
     } else if (lowerTopic.includes('recovery') || lowerTopic.includes('sleep')) {
       return 'Recovery & Rest';
@@ -348,6 +454,17 @@ Suggest ${limit} relevant fitness topics (comma-separated):`;
     if (lowerTopic.includes('weight loss')) baseTags.push('weight_loss');
     if (lowerTopic.includes('muscle')) baseTags.push('muscle_building');
     if (lowerTopic.includes('hiit')) baseTags.push('hiit');
+    
+    // Supplement-specific tags
+    if (lowerTopic.includes('creatine')) baseTags.push('creatine', 'supplements', 'performance');
+    if (lowerTopic.includes('protein')) baseTags.push('protein', 'supplements', 'recovery');
+    if (lowerTopic.includes('pre-workout')) baseTags.push('pre_workout', 'energy', 'performance');
+    if (lowerTopic.includes('bcaa')) baseTags.push('bcaa', 'amino_acids', 'recovery');
+    if (lowerTopic.includes('whey')) baseTags.push('whey', 'protein', 'post_workout');
+    
+    // Nutrition tags
+    if (lowerTopic.includes('meal prep')) baseTags.push('meal_prep', 'nutrition');
+    if (lowerTopic.includes('diet')) baseTags.push('diet', 'nutrition');
     
     return baseTags;
   }

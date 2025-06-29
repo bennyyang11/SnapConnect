@@ -58,57 +58,56 @@ export default function AROverlay({
   const getFilterStyle = () => {
     // Handle custom AI-generated filters
     if (typeof selectedFilter === 'string' && selectedFilter.startsWith('custom_')) {
-      return styles.customAIOverlay;
+      return [styles.customAIOverlay, styles.colorfulEffect];
     }
     
-    // Handle AI filter library filters by ID
+    // Handle AI filter library filters by ID with enhanced effects
     switch (selectedFilter) {
       case 'vintage':
-        return styles.vintageOverlay;
+        return [styles.vintageOverlay, styles.sepiaEffect];
       case 'neon':
-        return styles.neonOverlay;
+        return [styles.neonOverlay, styles.glowEffect];
       case 'rainbow':
-        return styles.rainbowOverlay;
-      case 'sunset':
-        return styles.sunsetOverlay;
-      case 'ocean':
-        return styles.oceanOverlay;
-      case 'forest':
-        return styles.forestOverlay;
-      case 'galaxy':
-        return styles.galaxyOverlay;
-      case 'warm':
-        return styles.warmOverlay;
-      case 'cool':
-        return styles.coolOverlay;
-      // AI Filter Library styles
-      case 'dark_glitch':
-        return styles.darkGlitchOverlay;
-      case 'noir_shadows':
-        return styles.noirOverlay;
       case 'rainbow_sparkles':
-        return styles.rainbowSparklesOverlay;
+        return [styles.rainbowSparklesOverlay, styles.vibrantEffect];
+      case 'sunset':
+        return [styles.sunsetOverlay, styles.warmEffect];
+      case 'ocean':
+        return [styles.oceanOverlay, styles.coolEffect];
+      case 'forest':
+        return [styles.forestOverlay, styles.naturalEffect];
+      case 'galaxy':
+        return [styles.galaxyOverlay, styles.cosmicEffect];
+      case 'warm':
+        return [styles.warmOverlay, styles.warmEffect];
+      case 'cool':
+        return [styles.coolOverlay, styles.coolEffect];
+      // AI Filter Library styles with enhanced effects
+      case 'dark_glitch':
+        return [styles.darkGlitchOverlay, styles.contrastEffect];
+      case 'noir_shadows':
+        return [styles.noirOverlay, styles.monochromeEffect];
       case 'golden_hour':
-        return styles.goldenHourOverlay;
+        return [styles.goldenHourOverlay, styles.warmGlowEffect];
       case 'vaporwave':
-        return styles.vaporwaveOverlay;
+        return [styles.vaporwaveOverlay, styles.synthEffect];
       case 'anime_style':
-        return styles.animeOverlay;
+        return [styles.animeOverlay, styles.popEffect];
       case 'soft_pastel':
-        return styles.softPastelOverlay;
+        return [styles.softPastelOverlay, styles.softEffect];
       case 'vintage_film':
-        return styles.vintageFilmOverlay;
+        return [styles.vintageFilmOverlay, styles.filmEffect];
       case 'cyberpunk_neon':
-        return styles.cyberpunkOverlay;
+        return [styles.cyberpunkOverlay, styles.neonEffect];
       case 'dreamy_clouds':
-        return styles.dreamyOverlay;
+        return [styles.dreamyOverlay, styles.dreamyEffect];
       default:
         return null;
     }
   };
 
-  const filterStyle = getFilterStyle();
-  if (!filterStyle) return null;
+  const filterStyles = getFilterStyle();
+  if (!filterStyles) return null;
 
   const isCustomFilter = typeof selectedFilter === 'string' && selectedFilter.startsWith('custom_');
 
@@ -117,14 +116,20 @@ export default function AROverlay({
       style={[styles.overlay, { opacity: overlayOpacity }]}
       pointerEvents="none"
     >
-      <View style={filterStyle} />
+      {/* Apply multiple filter layers for enhanced effect */}
+      {filterStyles.map((style, index) => (
+        <View key={index} style={style} />
+      ))}
       
-      {/* Custom Filter Indicator */}
-      {isCustomFilter && (
+      {/* Filter Indicator */}
+      {isActive && (
         <Animated.View 
-          style={[styles.customFilterIndicator, { opacity: textOpacity }]}
+          style={[styles.filterIndicator, { opacity: isCustomFilter ? textOpacity : 1 }]}
         >
-          <Text style={styles.customFilterText}>✨ AI CUSTOM FILTER ACTIVE ✨</Text>
+          <Text style={styles.filterText}>
+            {isCustomFilter ? '✨ AI CUSTOM FILTER ✨' : `🎨 ${selectedFilter?.toUpperCase()} FILTER`}
+          </Text>
+          <Text style={styles.filterSubtext}>Enhanced in photo editor</Text>
         </Animated.View>
       )}
     </Animated.View>
@@ -154,11 +159,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 255, 255, 0.1)',
-    shadowColor: '#00FFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    backgroundColor: 'rgba(0, 255, 255, 0.08)',
   },
   rainbowOverlay: {
     position: 'absolute',
@@ -223,13 +224,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(147, 112, 219, 0.15)',
-    borderWidth: 3.5,
-    borderColor: '#9370DB',
-    shadowColor: '#9370DB',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 15,
+    backgroundColor: 'rgba(147, 112, 219, 0.1)',
   },
   darkGlitchOverlay: {
     position: 'absolute',
@@ -237,9 +232,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 0, 0, 0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
   },
   noirOverlay: {
     position: 'absolute',
@@ -256,11 +249,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 0, 255, 0.1)',
-    shadowColor: '#FF69B4',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
+    backgroundColor: 'rgba(255, 0, 255, 0.08)',
   },
   goldenHourOverlay: {
     position: 'absolute',
@@ -276,9 +265,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 0, 255, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 0, 255, 0.1)',
   },
   animeOverlay: {
     position: 'absolute',
@@ -286,9 +273,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 105, 180, 0.1)',
-    borderWidth: 2,
-    borderColor: 'rgba(135, 206, 235, 0.2)',
+    backgroundColor: 'rgba(255, 105, 180, 0.08)',
   },
   softPastelOverlay: {
     position: 'absolute',
@@ -313,13 +298,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 255, 255, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 0, 255, 0.3)',
-    shadowColor: '#00FFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
+    backgroundColor: 'rgba(0, 255, 255, 0.08)',
   },
   dreamyOverlay: {
     position: 'absolute',
@@ -332,7 +311,7 @@ const styles = StyleSheet.create({
   },
   customFilterIndicator: {
     position: 'absolute',
-    top: 50,
+    top: 120, // Moved down to avoid overlapping with top controls
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -340,13 +319,183 @@ const styles = StyleSheet.create({
   },
   customFilterText: {
     color: '#9370DB',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     overflow: 'hidden',
     textAlign: 'center',
+  },
+  filterIndicator: {
+    position: 'absolute',
+    top: 120, // Moved down to avoid overlapping with top controls
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  filterText: {
+    color: '#FFDD3A',
+    fontSize: 12,
+    fontWeight: 'bold',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    overflow: 'hidden',
+    textAlign: 'center',
+    marginBottom: 3,
+  },
+  filterSubtext: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    overflow: 'hidden',
+    textAlign: 'center',
+  },
+  colorfulEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    opacity: 0.7,
+  },
+  sepiaEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(139, 69, 19, 0.2)',
+  },
+  glowEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 255, 255, 0.08)',
+  },
+  vibrantEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 0, 255, 0.1)',
+  },
+  warmEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 165, 0, 0.1)',
+  },
+  coolEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(173, 216, 230, 0.15)',
+  },
+  naturalEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(34, 139, 34, 0.15)',
+  },
+  cosmicEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(138, 43, 226, 0.15)',
+  },
+  contrastEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  monochromeEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    opacity: 0.8,
+  },
+  warmGlowEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+  },
+  synthEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 0, 255, 0.08)',
+  },
+  popEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 105, 180, 0.08)',
+  },
+  softEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 192, 203, 0.1)',
+  },
+  filmEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(139, 69, 19, 0.25)',
+    opacity: 0.9,
+  },
+  neonEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 255, 255, 0.08)',
+  },
+  dreamyEffect: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    opacity: 0.7,
   },
 }); 

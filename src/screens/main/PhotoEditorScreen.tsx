@@ -27,6 +27,8 @@ import { MainTabParamList, RootStackParamList } from '../../types';
 import { AIAssistant } from '../../components/AIAssistant';
 import { videoManager } from '../../services/videoManager';
 import FirebaseVideoService from '../../services/firebaseVideoService';
+import imageProcessingService, { FilterEffect } from '../../services/imageProcessingService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // import AppVideoStorage, { AppVideo } from '../../services/appVideoStorage';
 // import AppVideoGallery from '../../components/AppVideoGallery';
 
@@ -361,6 +363,10 @@ export default function PhotoEditorScreen() {
   const [selectedAIModel, setSelectedAIModel] = useState<AIModel>('dalle3');
   const [showModelSelector, setShowModelSelector] = useState(false);
   
+  // Filter state for applying effects to captured photos
+  const [appliedFilter, setAppliedFilter] = useState<FilterEffect | null>(null);
+  const [filterStyleString, setFilterStyleString] = useState<string>('');
+  
   const videoRef = useRef<Video>(null);
 
   // Check if this is a temp video file
@@ -381,6 +387,56 @@ export default function PhotoEditorScreen() {
     
     checkVideoFile();
   }, [photoUri, mediaType]);
+
+  // Load applied filter data when component mounts
+  useEffect(() => {
+    loadAppliedFilter();
+  }, [photoUri]);
+
+  const loadAppliedFilter = async () => {
+    try {
+      if (mediaType !== 'photo') return; // Only apply filters to photos
+      
+      console.log('🎨 PhotoEditor: Checking filter data for photo...');
+      console.log('🎨 PhotoEditor: Route params appliedFilter:', route.params.appliedFilter);
+      
+      // First, clear any existing filter state
+      setAppliedFilter(null);
+      setFilterStyleString('');
+      
+      // Only apply filters if they were specifically passed for this photo
+      if (route.params.appliedFilter) {
+        console.log('🎨 PhotoEditor: Applying filter passed via navigation params');
+        setAppliedFilter(route.params.appliedFilter);
+        
+        // If there's CSS filter string data, apply it too
+        if (route.params.appliedFilter.cssFilterString) {
+          setFilterStyleString(route.params.appliedFilter.cssFilterString);
+        }
+        
+        console.log('✅ PhotoEditor: Filter applied for this specific photo');
+      } else {
+        console.log('🎨 PhotoEditor: No filter specified for this photo - displaying original');
+        
+        // Clean up any old filter data from storage to prevent it from affecting future photos
+        const allKeys = await AsyncStorage.getAllKeys();
+        const filterKeys = allKeys.filter(key => key.startsWith('applied_filter_'));
+        
+        if (filterKeys.length > 0) {
+          console.log('🧹 PhotoEditor: Cleaning up old filter data from storage');
+          for (const key of filterKeys) {
+            await AsyncStorage.removeItem(key);
+          }
+          console.log('✅ PhotoEditor: Old filter data cleaned up');
+        }
+      }
+    } catch (error) {
+      console.error('❌ PhotoEditor: Error loading filter data:', error);
+      // Ensure we clear filter state on error
+      setAppliedFilter(null);
+      setFilterStyleString('');
+    }
+  };
 
 
 
@@ -497,6 +553,8 @@ export default function PhotoEditorScreen() {
       mediaType,
       caption,
       storyReply,
+      appliedFilter,
+      aiOverlays,
     });
   };
 
@@ -1097,6 +1155,274 @@ export default function PhotoEditorScreen() {
     );
   };
 
+  // Create dramatic filter overlay styles that actually match filter names
+  const createFilterOverlays = () => {
+    if (!appliedFilter) return [];
+    
+    const overlays = [];
+    const filterId = appliedFilter.id;
+    
+    // Create specific dramatic effects based on filter ID
+    switch (filterId) {
+      case 'rainbow_sparkles':
+        // Bright colorful overlay
+        overlays.push({
+          key: 'rainbowBase',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 0, 255, 0.3)',
+          }
+        });
+        
+        // Colorful sparkle dots
+        for (let i = 0; i < 15; i++) {
+          const colors = ['#FF69B4', '#FFD700', '#00FFFF', '#FF0080', '#ADFF2F', '#FF1493'];
+          overlays.push({
+            key: `sparkle${i}`,
+            style: {
+              position: 'absolute' as const,
+              top: 50 + Math.random() * 400,
+              left: 50 + Math.random() * 300,
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: colors[Math.floor(Math.random() * colors.length)],
+              elevation: 5,
+            }
+          });
+        }
+        
+        // Bright magical overlay
+        overlays.push({
+          key: 'magicalGlow',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.25)',
+          }
+        });
+        break;
+
+      case 'dark_glitch':
+        // Dark base overlay
+        overlays.push({
+          key: 'darkBase',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          }
+        });
+        
+        // Red glitch lines
+        for (let i = 0; i < 10; i++) {
+          overlays.push({
+            key: `glitchLine${i}`,
+            style: {
+              position: 'absolute' as const,
+              top: 50 + Math.random() * 500,
+              left: 0,
+              right: 0,
+              height: 4,
+              backgroundColor: '#FF0000',
+              opacity: 0.7,
+            }
+          });
+        }
+        
+        // Green glitch blocks
+        for (let i = 0; i < 8; i++) {
+          overlays.push({
+            key: `glitchBlock${i}`,
+            style: {
+              position: 'absolute' as const,
+              top: 100 + Math.random() * 400,
+              left: 50 + Math.random() * 250,
+              width: 50,
+              height: 25,
+              backgroundColor: '#00FF00',
+              opacity: 0.4,
+            }
+          });
+        }
+        break;
+
+      case 'noir_shadows':
+        // Strong dark overlay for noir effect
+        overlays.push({
+          key: 'noirDark',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          }
+        });
+        
+        // High contrast white overlay
+        overlays.push({
+          key: 'noirContrast',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+          }
+        });
+        break;
+
+      case 'vintage_film':
+      case 'vintage':
+        // Sepia tone overlay
+        overlays.push({
+          key: 'vintageSepia',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(196, 154, 108, 0.6)',
+          }
+        });
+        
+        // Warm overlay
+        overlays.push({
+          key: 'warmVintage',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 200, 150, 0.3)',
+          }
+        });
+        break;
+
+      case 'cyberpunk_neon':
+        // Dark cyberpunk base
+        overlays.push({
+          key: 'cyberpunkDark',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 30, 0.4)',
+          }
+        });
+        
+        // Cyan tint
+        overlays.push({
+          key: 'cyanTint',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 255, 255, 0.2)',
+          }
+        });
+        
+        // Magenta highlights
+        overlays.push({
+          key: 'magentaHighlights',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 0, 255, 0.15)',
+          }
+        });
+        break;
+
+      case 'golden_hour':
+        // Warm golden overlay
+        overlays.push({
+          key: 'goldenBase',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 215, 0, 0.4)',
+          }
+        });
+        
+        // Orange warmth
+        overlays.push({
+          key: 'orangeWarmth',
+          style: {
+            position: 'absolute' as const,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 165, 0, 0.2)',
+          }
+        });
+        break;
+
+      default:
+        // Generic dramatic filter
+        if (appliedFilter.colorOverlay) {
+          const { red, green, blue, alpha } = appliedFilter.colorOverlay;
+          overlays.push({
+            key: 'colorOverlay',
+            style: {
+              position: 'absolute' as const,
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: `rgba(${red}, ${green}, ${blue}, ${Math.min(alpha * 3, 0.6)})`,
+            }
+          });
+        }
+        
+        // Dramatic brightness effects
+        if (appliedFilter.brightness !== undefined && appliedFilter.brightness !== 0) {
+          const brightness = appliedFilter.brightness;
+          overlays.push({
+            key: 'brightnessOverlay',
+            style: {
+              position: 'absolute' as const,
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: brightness > 0 
+                ? `rgba(255, 255, 255, ${Math.min(brightness * 0.8, 0.5)})` 
+                : `rgba(0, 0, 0, ${Math.min(Math.abs(brightness) * 0.8, 0.7)})`,
+            }
+          });
+        }
+        break;
+    }
+    
+    return overlays;
+  };
+
   return (
     <View style={styles.container}>
       <TouchableWithoutFeedback 
@@ -1344,12 +1670,31 @@ export default function PhotoEditorScreen() {
                   <Text style={styles.placeholderSubtext}>Unable to load photo</Text>
                 </View>
               ) : (
-                <Image 
-                  source={{ uri: photoUri }} 
-                  style={styles.photoPreview} 
-                  resizeMode="cover"
-                  onError={() => setImageError(true)}
-                />
+                <View style={styles.filteredPhotoContainer}>
+                  <Image 
+                    source={{ uri: photoUri }} 
+                    style={styles.photoPreview} 
+                    resizeMode="cover"
+                    onError={() => setImageError(true)}
+                  />
+                  
+                  {/* Apply filter overlays */}
+                  {createFilterOverlays().map((overlay) => (
+                    <View
+                      key={overlay.key}
+                      style={overlay.style}
+                    />
+                  ))}
+                  
+                  {/* Filter name indicator */}
+                  {appliedFilter && (
+                    <View style={styles.filterIndicatorContainer}>
+                      <Text style={styles.filterIndicatorText}>
+                        🎨 {appliedFilter.name} Filter Applied
+                      </Text>
+                    </View>
+                  )}
+                </View>
               )
             )}
             
@@ -1727,6 +2072,29 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  filteredPhotoContainer: {
+    flex: 1,
+    width: '100%',
+    position: 'relative',
+    backgroundColor: '#161618',
+  },
+  filterIndicatorContainer: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    maxWidth: '65%',
+    zIndex: 5,
+  },
+  filterIndicatorText: {
+    color: '#FFDD3A',
+    fontSize: 13,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
   videoPreview: {
     width: '100%',
     height: '100%',
@@ -2016,32 +2384,39 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     right: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 8,
+    zIndex: 3,
   },
   aiAssistantButton: {
     backgroundColor: '#FFD700',
-    padding: 10,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    minWidth: 70,
   },
   aiAssistantButtonText: {
     color: '#000000',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   filterButton: {
     backgroundColor: 'rgba(255,255,255,0.15)',
-    padding: 10,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    minWidth: 70,
   },
   activeFilterButton: {
     backgroundColor: '#FFDD3A',
   },
   filterButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '500',
+    textAlign: 'center',
   },
   activeFilterText: {
     color: '#0D0D0F',
@@ -2050,25 +2425,31 @@ const styles = StyleSheet.create({
   // Gallery button styles
   galleryButton: {
     backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    minWidth: 70,
   },
   galleryButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
 
   // AI Overlay button styles
   aiOverlayButton: {
     backgroundColor: '#FF6B6B',
-    padding: 10,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    minWidth: 85,
   },
   aiOverlayButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
 
   // AI Modal styles
@@ -2270,11 +2651,12 @@ const styles = StyleSheet.create({
   },
   clearOverlaysButton: {
     position: 'absolute',
-    top: 60,
+    top: 110,
     left: 10,
     backgroundColor: 'rgba(255, 0, 0, 0.8)',
-    padding: 8,
-    borderRadius: 15,
+    padding: 10,
+    borderRadius: 18,
+    zIndex: 4,
   },
   clearOverlaysText: {
     color: '#FFFFFF',

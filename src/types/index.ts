@@ -224,6 +224,7 @@ export type RootStackParamList = {
       storyId: string;
     };
     videoSessionId?: string; // For AI-powered video management
+    appliedFilter?: any; // Filter that was applied during capture
   };
   ShareScreen: {
     photoUri: string;
@@ -233,8 +234,21 @@ export type RootStackParamList = {
       storyUserId: string;
       storyId: string;
     };
+    appliedFilter?: any; // Filter applied in photo editor
+    aiOverlays?: Array<{
+      id: string;
+      imageUri: string;
+      x: number;
+      y: number;
+      scale: number;
+      prompt: string;
+    }>; // AI-generated stickers/overlays
   };
   WorkoutSearchScreen: undefined;
+  ArticleDetail: {
+    article: any; // FitnessContent type
+    source?: string;
+  };
   FriendshipMemory: undefined;
   Settings: undefined;
 };
@@ -264,6 +278,7 @@ export type MainTabParamList = {
       storyId: string;
     };
     videoSessionId?: string; // For AI-powered video management
+    appliedFilter?: any; // Filter that was applied during capture
   };
   ShareScreen: {
     photoUri: string;
@@ -273,6 +288,15 @@ export type MainTabParamList = {
       storyUserId: string;
       storyId: string;
     };
+    appliedFilter?: any; // Filter applied in photo editor
+    aiOverlays?: Array<{
+      id: string;
+      imageUri: string;
+      x: number;
+      y: number;
+      scale: number;
+      prompt: string;
+    }>; // AI-generated stickers/overlays
   };
 };
 
@@ -389,4 +413,30 @@ export interface AppActions {
   addFitnessMessage: (message: FitnessChatMessage) => void;
   updateCurrentWorkout: (exercises: string[], muscles: string[]) => void;
   clearFitnessChat: () => void;
+}
+
+// Fitness/OpenAI Service Types
+export interface RAGContext {
+  workoutHistory: { type: string; date: Date }[];
+  userInterests: string[];
+  recentActivity: string[];
+  trendingTopics: string[];
+  personalBrand?: PersonalBrand;
+}
+
+export interface ContentSuggestion {
+  id: string;
+  type: 'caption' | 'post_idea' | 'workout_plan' | 'challenge';
+  title: string;
+  content: string;
+  relevanceScore: number;
+  tags: string[];
+  estimatedEngagement: number;
+  generatedAt: Date;
+}
+
+export interface PersonalBrand {
+  tone: 'casual' | 'professional' | 'motivational' | 'humorous';
+  focusAreas: string[];
+  targetAudience: string[];
 } 

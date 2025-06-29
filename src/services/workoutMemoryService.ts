@@ -129,7 +129,7 @@ export class WorkoutMemoryService {
   }
 
   /**
-   * Store workout content in memory system (demo mode - logs only)
+   * Store workout content in Pinecone memory system
    */
   static async storeWorkoutMemory(
     userId: string,
@@ -138,12 +138,18 @@ export class WorkoutMemoryService {
     caption: string
   ): Promise<WorkoutEntry | null> {
     try {
-      console.log('🏋️ Storing workout memory for user (demo mode):', userId);
+      console.log('🏋️ Storing workout memory in Pinecone for user:', userId);
 
       // Extract workout information
       const workoutInfo = this.extractWorkoutInfo(caption);
       
-      // Create workout entry (demo mode - no actual storage)
+      // Only store if it's actually workout-related content
+      if (!this.isWorkoutContent(caption)) {
+        console.log('📝 Content not workout-related, skipping storage');
+        return null;
+      }
+
+      // Create workout entry
       const workoutEntry: WorkoutEntry = {
         id: `workout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId,
@@ -154,15 +160,35 @@ export class WorkoutMemoryService {
         muscleGroups: workoutInfo.muscleGroups,
         exercises: workoutInfo.exercises,
         timestamp: Date.now(),
-        embeddingId: `demo_embed_${Date.now()}`,
-        workoutDate: new Date().toISOString().split('T')[0]
+        embeddingId: `workout_embed_${Date.now()}`,
+        workoutDate: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD format in local timezone
       };
 
-      console.log('✅ Workout memory logged (demo mode):', {
-        muscleGroups: workoutInfo.muscleGroups,
-        exercises: workoutInfo.exercises,
-        workoutTypes: workoutInfo.detectedWorkouts
-      });
+      // Store in Pinecone using the existing content embedding system
+      try {
+        const { createContentEmbedding } = await import('./aiFeatures');
+        
+        const contentVector = await createContentEmbedding({
+          uri: mediaUri,
+          type: mediaType,
+          caption: caption,
+          userId: userId
+        });
+
+        if (contentVector) {
+          console.log('✅ Workout memory stored in Pinecone successfully');
+          console.log('🏋️ Workout details:', {
+            muscleGroups: workoutInfo.muscleGroups,
+            exercises: workoutInfo.exercises,
+            workoutTypes: workoutInfo.detectedWorkouts,
+            date: workoutEntry.workoutDate
+          });
+        } else {
+          console.warn('⚠️ Failed to store workout in Pinecone');
+        }
+      } catch (pineconeError) {
+        console.error('❌ Error storing workout in Pinecone:', pineconeError);
+      }
       
       return workoutEntry;
 
@@ -173,7 +199,7 @@ export class WorkoutMemoryService {
   }
 
   /**
-   * Search workout memories using natural language (conversation + demo)
+   * Search workout memories using natural language (conversation + Pinecone)
    */
   static async searchWorkoutMemories(
     userId: string,
@@ -183,19 +209,30 @@ export class WorkoutMemoryService {
     try {
       console.log('🔍 Searching workout memories:', query);
 
-      // Search both conversation memory AND demo data
-      const conversationResults = await this.searchConversationWorkouts(userId, query, limit);
-      const demoResults = this.getDemoWorkoutResults(query, limit);
+      // Search conversation memory for workout mentions
+      const conversationResults = await this.searchConversationWorkouts(userId, query, Math.ceil(limit / 2));
+      
+      // Search Pinecone for stored workout content
+      const pineconeResults = await this.searchPineconeWorkouts(userId, query, Math.ceil(limit / 2));
 
-      // Combine and prioritize conversation results
-      const combinedResults = [...conversationResults, ...demoResults].slice(0, limit);
+      // Combine and prioritize results
+      const combinedResults = [...conversationResults, ...pineconeResults]
+        .sort((a, b) => {
+          // First by relevance, then by recency
+          if (Math.abs(a.similarity - b.similarity) < 0.1) {
+            return b.entry.timestamp - a.entry.timestamp; // More recent first
+          }
+          return b.similarity - a.similarity; // Higher relevance first
+        })
+        .slice(0, limit);
 
-      console.log(`✅ Found ${conversationResults.length} conversation workouts + ${demoResults.length} demo workouts`);
+      console.log(`✅ Found ${conversationResults.length} conversation workouts + ${pineconeResults.length} Pinecone workouts`);
       return combinedResults;
 
     } catch (error) {
       console.error('❌ Error searching workout memories:', error);
-      return this.getDemoWorkoutResults(query, limit);
+      // Return only conversation results if Pinecone fails
+      return await this.searchConversationWorkouts(userId, query, limit);
     }
   }
 
@@ -292,6 +329,13 @@ export class WorkoutMemoryService {
             console.log(`📊 Total relevance: ${relevance}`);
             
             if (relevance > 0.2) { // Only include relevant results
+              // Fix: Use local date instead of UTC to prevent timezone issues
+              const localDate = new Date(message.timestamp);
+              const year = localDate.getFullYear();
+              const month = String(localDate.getMonth() + 1).padStart(2, '0');
+              const day = String(localDate.getDate()).padStart(2, '0');
+              const workoutDateLocal = `${year}-${month}-${day}`;
+              
               const workoutEntry: WorkoutEntry = {
                 id: `conv_workout_${message.id}`,
                 userId,
@@ -303,7 +347,7 @@ export class WorkoutMemoryService {
                 exercises: workoutInfo.exercises,
                 timestamp: message.timestamp.getTime(),
                 embeddingId: `conv_embed_${message.id}`,
-                workoutDate: message.timestamp.toISOString().split('T')[0]
+                workoutDate: workoutDateLocal
               };
 
               workoutResults.push({
@@ -312,7 +356,7 @@ export class WorkoutMemoryService {
                 relevantText: message.text
               });
               
-              console.log(`✅ Added workout result: "${message.text}" (score: ${relevance})`);
+              console.log(`✅ Added workout result: "${message.text}" (score: ${relevance}) - Date: ${workoutDateLocal}`);
             }
           }
         });
@@ -333,6 +377,124 @@ export class WorkoutMemoryService {
 
     } catch (error) {
       console.error('❌ Error searching conversation workouts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Search Pinecone for workout-related content
+   */
+  private static async searchPineconeWorkouts(
+    userId: string,
+    query: string,
+    limit: number
+  ): Promise<WorkoutSearchResult[]> {
+    try {
+      console.log('🔍 Searching Pinecone for workout content...');
+
+      // Import required functions
+      const { queryPinecone } = await import('./pinecone');
+      
+      // Create search query with workout context
+      const workoutQuery = `${query} workout fitness exercise gym training muscle`;
+      
+      // Convert text query to embeddings first
+      try {
+        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-large',
+            input: workoutQuery,
+            dimensions: 3072 // Matches your rag-project-index
+          }),
+        });
+
+        if (!embeddingResponse.ok) {
+          throw new Error(`Embedding failed: ${embeddingResponse.status}`);
+        }
+
+        const embeddingData = await embeddingResponse.json();
+        const queryVector = embeddingData.data[0].embedding;
+
+        // Query Pinecone with the vector
+        const pineconeResponse = await queryPinecone(queryVector, limit * 2); // Get more to filter
+        const pineconeResults = pineconeResponse.matches || [];
+        
+        if (!pineconeResults || pineconeResults.length === 0) {
+          console.log('📝 No Pinecone workout results found');
+          return [];
+        }
+
+        console.log(`📊 Found ${pineconeResults.length} Pinecone results`);
+
+        // Convert Pinecone results to WorkoutSearchResult format
+        const workoutResults: WorkoutSearchResult[] = [];
+        
+        for (const result of pineconeResults) {
+          try {
+            const metadata = result.metadata;
+            
+            // Only include results that have workout-related content
+            const caption = metadata.caption || metadata.text || '';
+            const isWorkoutRelated = this.isWorkoutContent(caption);
+            
+            if (isWorkoutRelated && metadata.userId === userId) {
+              // Extract workout info
+              const workoutInfo = this.extractWorkoutInfo(caption);
+              
+              // Create proper date handling for Pinecone stored content
+              let workoutDate = '';
+              if (metadata.timestamp) {
+                const date = new Date(metadata.timestamp);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                workoutDate = `${year}-${month}-${day}`;
+              } else {
+                workoutDate = new Date().toLocaleDateString('en-CA');
+              }
+              
+              const workoutEntry: WorkoutEntry = {
+                id: result.id || `pinecone_${Date.now()}`,
+                userId,
+                mediaUri: metadata.uri || metadata.mediaUri || 'pinecone://content',
+                mediaType: (metadata.type as 'photo' | 'video') || 'photo',
+                caption,
+                detectedWorkouts: workoutInfo.detectedWorkouts,
+                muscleGroups: workoutInfo.muscleGroups,
+                exercises: workoutInfo.exercises,
+                timestamp: metadata.timestamp || Date.now(),
+                embeddingId: result.id || '',
+                workoutDate
+              };
+
+              workoutResults.push({
+                entry: workoutEntry,
+                similarity: result.score || 0.7,
+                relevantText: caption
+              });
+              
+              console.log(`✅ Added Pinecone workout: "${caption.substring(0, 50)}..." - Date: ${workoutDate}`);
+            }
+          } catch (entryError) {
+            console.warn('⚠️ Error processing Pinecone result:', entryError);
+          }
+        }
+
+        console.log(`✅ Processed ${workoutResults.length} Pinecone workout results`);
+        return workoutResults.slice(0, limit);
+
+      } catch (embeddingError) {
+        console.error('❌ Error creating embedding for query:', embeddingError);
+        return [];
+      }
+
+    } catch (error) {
+      console.error('❌ Error searching Pinecone workouts:', error);
       return [];
     }
   }
@@ -359,106 +521,6 @@ export class WorkoutMemoryService {
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
     return date >= threeDaysAgo;
-  }
-
-  /**
-   * Generate demo workout results for demonstration
-   */
-  private static getDemoWorkoutResults(query: string, limit: number): WorkoutSearchResult[] {
-    const lowerQuery = query.toLowerCase();
-    
-    const demoWorkouts = [
-      {
-        id: 'demo_workout_1',
-        userId: 'demo-user',
-        mediaUri: 'demo://workout1.jpg',
-        mediaType: 'photo' as const,
-        caption: '💪 Crushed chest day today! Bench press 3x12, incline press 3x10, flies 3x15. Feeling the pump! #ChestDay #BenchPress',
-        detectedWorkouts: ['chest day'],
-        muscleGroups: ['chest', 'arms'],
-        exercises: ['bench press', 'incline press', 'flies'],
-        timestamp: Date.now() - (2 * 24 * 60 * 60 * 1000), // 2 days ago
-        embeddingId: 'demo_embed_1',
-        workoutDate: new Date(Date.now() - (2 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0]
-      },
-      {
-        id: 'demo_workout_2',
-        userId: 'demo-user',
-        mediaUri: 'demo://workout2.jpg',
-        mediaType: 'photo' as const,
-        caption: '🦵 Leg day destruction! Squats 4x8, Romanian deadlifts 3x10, leg press 3x15. Can barely walk! #LegDay #Squats',
-        detectedWorkouts: ['leg day'],
-        muscleGroups: ['legs', 'glutes'],
-        exercises: ['squats', 'deadlifts', 'leg press'],
-        timestamp: Date.now() - (5 * 24 * 60 * 60 * 1000), // 5 days ago
-        embeddingId: 'demo_embed_2',
-        workoutDate: new Date(Date.now() - (5 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0]
-      },
-      {
-        id: 'demo_workout_3',
-        userId: 'demo-user',
-        mediaUri: 'demo://workout3.jpg',
-        mediaType: 'photo' as const,
-        caption: '💪 Pull day vibes! Lat pulldowns 4x10, barbell rows 3x8, bicep curls 3x12. Back and biceps on fire! #PullDay #BackDay',
-        detectedWorkouts: ['pull day'],
-        muscleGroups: ['back', 'arms'],
-        exercises: ['pulldowns', 'rows', 'curls'],
-        timestamp: Date.now() - (7 * 24 * 60 * 60 * 1000), // 7 days ago
-        embeddingId: 'demo_embed_3',
-        workoutDate: new Date(Date.now() - (7 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0]
-      },
-      {
-        id: 'demo_workout_4',
-        userId: 'demo-user',
-        mediaUri: 'demo://workout4.jpg',
-        mediaType: 'photo' as const,
-        caption: '🔥 HIIT cardio session! 30 minutes of intervals on the treadmill. Sweat city! #Cardio #HIIT #Treadmill',
-        detectedWorkouts: ['cardio'],
-        muscleGroups: ['core'],
-        exercises: ['running', 'intervals'],
-        timestamp: Date.now() - (10 * 24 * 60 * 60 * 1000), // 10 days ago
-        embeddingId: 'demo_embed_4',
-        workoutDate: new Date(Date.now() - (10 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0]
-      },
-      {
-        id: 'demo_workout_5',
-        userId: 'demo-user',
-        mediaUri: 'demo://workout5.jpg',
-        mediaType: 'photo' as const,
-        caption: '💪 Arm day complete! Bicep curls 4x12, tricep extensions 4x10, hammer curls 3x15. Arms are pumped! #ArmDay #Biceps #Triceps',
-        detectedWorkouts: ['arm day'],
-        muscleGroups: ['arms'],
-        exercises: ['curls', 'extensions'],
-        timestamp: Date.now() - (12 * 24 * 60 * 60 * 1000), // 12 days ago
-        embeddingId: 'demo_embed_5',
-        workoutDate: new Date(Date.now() - (12 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0]
-      }
-    ];
-
-    // Filter workouts based on query relevance
-    const filteredWorkouts = demoWorkouts.filter(workout => {
-      const searchText = `${workout.caption} ${workout.muscleGroups.join(' ')} ${workout.exercises.join(' ')} ${workout.detectedWorkouts.join(' ')}`.toLowerCase();
-      
-      // Check for keyword matches
-      if (lowerQuery.includes('chest') && searchText.includes('chest')) return true;
-      if (lowerQuery.includes('leg') && searchText.includes('leg')) return true;
-      if (lowerQuery.includes('arm') && searchText.includes('arm')) return true;
-      if (lowerQuery.includes('back') && searchText.includes('back')) return true;
-      if (lowerQuery.includes('pull') && searchText.includes('pull')) return true;
-      if (lowerQuery.includes('cardio') && searchText.includes('cardio')) return true;
-      if (lowerQuery.includes('squat') && searchText.includes('squat')) return true;
-      if (lowerQuery.includes('bench') && searchText.includes('bench')) return true;
-      if (lowerQuery.includes('week') || lowerQuery.includes('last') || lowerQuery.includes('recent')) return true;
-      
-      return true; // Return all for general queries
-    });
-
-    // Convert to WorkoutSearchResult format
-    return filteredWorkouts.slice(0, limit).map(workout => ({
-      entry: workout,
-      similarity: 0.85, // Demo similarity score
-      relevantText: workout.caption
-    }));
   }
 
   /**

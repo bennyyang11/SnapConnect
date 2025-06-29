@@ -27,8 +27,8 @@ export default function FriendshipMemoryScreen() {
   const [timelines, setTimelines] = useState<FriendshipTimeline[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SharedMoment[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'timeline' | 'insights' | 'search'>('timeline');
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     loadFriendshipData();
@@ -59,9 +59,15 @@ export default function FriendshipMemoryScreen() {
     try {
       const results = await FriendshipMemoryService.searchSimilarMoments(searchQuery, user.id);
       setSearchResults(results);
+      
+      if (results.length === 0) {
+        Alert.alert('Search Results', 'No memories found for your search. Try sharing some snaps with friends first!');
+      }
+      
     } catch (error) {
       console.error('Search error:', error);
-      Alert.alert('Search Error', 'Unable to search memories. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Search Error', `Unable to search memories: ${errorMessage}. Check the console for details.`);
     } finally {
       setIsSearching(false);
     }
@@ -130,6 +136,8 @@ export default function FriendshipMemoryScreen() {
       ]
     );
   };
+
+
 
   const renderTimelineTab = () => (
     <ScrollView style={styles.scrollContainer}>

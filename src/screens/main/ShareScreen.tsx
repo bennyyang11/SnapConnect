@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,9 @@ import { useAppStore } from '../../store/useAppStore';
 import { MainTabParamList, Friend, Story, Message, Chat } from '../../types';
 import WorkoutMemoryService from '../../services/workoutMemoryService';
 import FriendshipMemoryService from '../../services/friendshipMemoryService';
+import * as FileSystem from 'expo-file-system';
+import { captureRef } from 'react-native-view-shot';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 const { width, height } = Dimensions.get('window');
 
@@ -67,12 +70,17 @@ const FriendItem: React.FC<FriendItemProps> = ({ friend, isSelected, onToggle })
 export default function ShareScreen() {
   const navigation = useNavigation<ShareScreenNavigationProp>();
   const route = useRoute<ShareScreenRouteProp>();
-  const { photoUri, mediaType, caption, storyReply } = route.params;
+  const { photoUri, mediaType, caption, storyReply, appliedFilter, aiOverlays } = route.params;
 
   const { user, friends, addStory, chats, addMessage, setChats, incrementSnapScore } = useAppStore();
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [imageError, setImageError] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [compositedImageUri, setCompositedImageUri] = useState<string | null>(null);
+  const [filteredImageUri, setFilteredImageUri] = useState<string | null>(null);
+  const [isCompositing, setIsCompositing] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
+  const compositingViewRef = useRef<View>(null);
 
   // Check if this is a test/invalid URI
   const isTestUri = photoUri?.startsWith('test://') || !photoUri;
@@ -87,6 +95,29 @@ export default function ShareScreen() {
   };
   
   const testUriType = getTestUriType();
+
+  // Filter styling helper
+  const getFilterStyle = (filter: any) => {
+    switch (filter.id) {
+      case 'noir_shadows':
+        return {
+          backgroundColor: 'rgba(128,128,128,0.5)', // Gray overlay for B&W effect
+          opacity: 0.7,
+        };
+      case 'vintage':
+        return {
+          backgroundColor: 'rgba(255,220,150,0.3)', // Sepia-like overlay
+          opacity: 0.6,
+        };
+      case 'dramatic':
+        return {
+          backgroundColor: 'rgba(0,0,0,0.25)', // Dark overlay for contrast
+          opacity: 0.5,
+        };
+      default:
+        return {};
+    }
+  };
 
   // Story reply helper functions
   const findOrCreateChat = (otherUserId: string): string => {
@@ -137,13 +168,18 @@ export default function ShareScreen() {
     try {
       const chatId = findOrCreateChat(storyReply.storyUserId);
       
+      // Use composite image for photos if available
+      const finalMediaUrl = mediaType === 'photo' && compositedImageUri 
+        ? compositedImageUri 
+        : photoUri;
+
       const replyMessage: Message = {
         id: `${chatId}_${Date.now()}_story_snap_reply`,
         chatId,
         senderId: user?.id || 'demo-user',
         type: mediaType === 'photo' ? 'image' : 'video',
         content: caption.trim() || `📸 Replied to your story with a ${mediaType}`,
-        mediaUrl: photoUri, // Use the actual photo/video URI
+        mediaUrl: finalMediaUrl,
         isRead: false,
         readBy: [],
         isTemporary: true,
@@ -173,6 +209,87 @@ export default function ShareScreen() {
     }
   };
 
+    // Composite image with filters and AI overlays using view capture
+  const createCompositeImage = async () => {
+    if (mediaType !== 'photo') {
+      console.log('🚫 Skipping compositing - not a photo');
+      return;
+    }
+
+    setIsCompositing(true);
+    
+    try {
+      console.log('🖼️ Starting composite image creation...');
+      console.log('🎨 Filter to apply:', appliedFilter?.name);
+      console.log('🤖 Overlays to composite:', aiOverlays?.length || 0);
+      
+      // First, prepare base image (resize for consistency)
+      console.log('🔧 Preparing base image...');
+      const result = await manipulateAsync(photoUri, [{ resize: { width: 1024 } }], {
+        compress: 0.8,
+        format: SaveFormat.JPEG,
+      });
+      
+      const baseImageUri = result.uri;
+      setFilteredImageUri(baseImageUri);
+      console.log('✅ Base image prepared:', baseImageUri);
+      
+      // Wait a moment for state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Check if we need compositing (filters or overlays)
+      const hasFilter = appliedFilter;
+      const hasOverlays = aiOverlays && aiOverlays.length > 0;
+      
+      if (hasFilter || hasOverlays) {
+        console.log('🖼️ Compositing needed - capturing view...');
+        
+        // Wait for view to render with the base image
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        if (compositingViewRef.current) {
+          try {
+            console.log('📸 Capturing composite view...');
+            const capturedUri = await captureRef(compositingViewRef.current, {
+              format: 'jpg',
+              quality: 0.9,
+              width: 1024,
+              height: 1024,
+            });
+            
+            console.log('✅ Successfully captured composite:', capturedUri);
+            setCompositedImageUri(capturedUri);
+          } catch (captureError) {
+            console.error('❌ View capture failed:', captureError);
+            console.log('⚠️ Using base image as fallback');
+            setCompositedImageUri(baseImageUri);
+          }
+        } else {
+          console.log('⚠️ Compositing view ref not available');
+          setCompositedImageUri(baseImageUri);
+        }
+      } else {
+        console.log('✅ No compositing needed, using base image');
+        setCompositedImageUri(baseImageUri);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in composite creation:', error);
+      setCompositedImageUri(photoUri);
+    } finally {
+      setIsCompositing(false);
+    }
+  };
+
+  // Create composite image when component loads
+  useEffect(() => {
+    // Delay compositing to ensure views are rendered
+    const timer = setTimeout(() => {
+      createCompositeImage();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [appliedFilter, aiOverlays, photoUri, mediaType]);
+
   // If this is a story reply, show story reply UI instead of normal sharing options
 
   const toggleFriendSelection = (friendId: string) => {
@@ -184,12 +301,59 @@ export default function ShareScreen() {
   };
 
   const addToStory = async () => {
+    if (isPosting) {
+      console.log('🚫 Already posting to story, preventing duplicate...');
+      return;
+    }
+
+    setIsPosting(true);
+    
     try {
+      // Wait for composite image if it's being created
+      if (isCompositing) {
+        console.log('⏳ Waiting for composite image creation...');
+        await new Promise(resolve => {
+          const checkComposite = () => {
+            if (!isCompositing) {
+              resolve(undefined);
+            } else {
+              setTimeout(checkComposite, 100);
+            }
+          };
+          checkComposite();
+        });
+      }
+
+      // Determine final media URL based on what's available
+      let finalMediaUrl = photoUri; // Default fallback
+      
+      if (mediaType === 'photo') {
+        if (compositedImageUri) {
+          // Use composite image if available (filter + stickers)
+          finalMediaUrl = compositedImageUri;
+          console.log('✅ Using composite image (filter + stickers)');
+        } else if (filteredImageUri) {
+          // Use filtered image if no stickers but filter applied
+          finalMediaUrl = filteredImageUri;
+          console.log('✅ Using filtered image (filter only)');
+        } else {
+          // Use original image
+          finalMediaUrl = photoUri;
+          console.log('✅ Using original image (no edits)');
+        }
+      } else {
+        finalMediaUrl = isTestUri ? actualUri : photoUri;
+      }
+
+      console.log('📸 Adding to story with media URL:', finalMediaUrl);
+      console.log('🎨 Applied filter:', appliedFilter?.name);
+      console.log('🤖 AI overlays count:', aiOverlays?.length || 0);
+
       const newStory: Story = {
         id: `story_${Date.now()}`,
         userId: user?.id || 'demo-user',
         type: mediaType === 'photo' ? 'image' : 'video',
-        mediaUrl: isTestUri ? actualUri : photoUri,
+        mediaUrl: finalMediaUrl,
         caption: caption.trim() || undefined,
         duration: mediaType === 'video' ? 5 : undefined,
         viewCount: 0,
@@ -204,33 +368,7 @@ export default function ShareScreen() {
       // 📊 Increment snap score for posting story (+1)
       incrementSnapScore(1);
 
-      // 🏋️ Check if this is workout content and store in SnapSearch AI
-      const captionText = caption.trim();
-      if (captionText && WorkoutMemoryService.isWorkoutContent(captionText)) {
-        console.log('🏋️ Workout content detected, storing in SnapSearch AI...');
-        
-        try {
-          const workoutEntry = await WorkoutMemoryService.storeWorkoutMemory(
-            user?.id || 'demo-user',
-            photoUri,
-            mediaType as 'photo' | 'video',
-            captionText
-          );
-
-          if (workoutEntry) {
-            const workoutInfo = WorkoutMemoryService.extractWorkoutInfo(captionText);
-            console.log('✅ Workout stored successfully:', {
-              muscleGroups: workoutInfo.muscleGroups,
-              exercises: workoutInfo.exercises,
-              workoutTypes: workoutInfo.detectedWorkouts
-            });
-          }
-        } catch (error) {
-          console.error('❌ Error storing workout memory:', error);
-        }
-      }
-      
-      const isWorkout = captionText && WorkoutMemoryService.isWorkoutContent(captionText);
+      const isWorkout = caption.trim() && WorkoutMemoryService.isWorkoutContent(caption.trim());
       const successMessage = isTestUri && mediaType === 'video' 
         ? testUriType === 'recorded-successfully'
           ? 'Your video was recorded successfully and has been added to your story! 📊 +1 Snap Score!'
@@ -251,7 +389,10 @@ export default function ShareScreen() {
         }}]
       );
     } catch (error) {
+      console.error('❌ Error adding to story:', error);
       Alert.alert('Error', 'Failed to add to story. Please try again.');
+    } finally {
+      setIsPosting(false);
     }
   };
 
@@ -300,6 +441,11 @@ export default function ShareScreen() {
             tags: ['snap', mediaType, 'shared'],
           };
 
+          console.log('🤖 Tracking friendship snap for friend:', friendId);
+          console.log('📝 Snap caption:', snapMetadata.caption);
+          console.log('👤 Sender ID:', user?.id || 'demo-user');
+          console.log('📦 Full snap metadata:', snapMetadata);
+
           await FriendshipMemoryService.trackFriendshipSnap(
             user?.id || 'demo-user',
             friendId,
@@ -329,6 +475,11 @@ export default function ShareScreen() {
           chatId = friendId === 'john_doe' ? '1' : '2';
         }
 
+        // Use composite image for photos if available
+        const finalMediaUrl = mediaType === 'photo' && compositedImageUri 
+          ? compositedImageUri 
+          : isTestUri ? actualUri : photoUri;
+
         // Create message
         const snapMessage: Message = {
           id: `${chatId}_${Date.now()}_snap`,
@@ -336,7 +487,7 @@ export default function ShareScreen() {
           senderId: user?.id || 'demo-user',
           type: mediaType === 'photo' ? 'image' : 'video',
           content: caption.trim() || `${mediaType === 'photo' ? 'Photo' : 'Video'} snap`,
-          mediaUrl: isTestUri ? actualUri : photoUri,
+          mediaUrl: finalMediaUrl,
           isRead: false,
           readBy: [],
           isTemporary: true,
@@ -382,6 +533,51 @@ export default function ShareScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Hidden compositing view for AI overlays - only renders when there are overlays */}
+      <View 
+        ref={compositingViewRef}
+        style={styles.hiddenCompositingView}
+        pointerEvents="none"
+      >
+        {mediaType === 'photo' && filteredImageUri && (
+          <View style={styles.compositingContainer}>
+            {/* Base image container with filter effects */}
+            <View style={styles.compositingImageContainer}>
+              <Image 
+                source={{ uri: filteredImageUri }} 
+                style={styles.compositingBaseImage} 
+                resizeMode="cover"
+              />
+              
+                             {/* Filter overlay effects */}
+               {appliedFilter && (
+                 <View style={[
+                   styles.filterOverlay,
+                   getFilterStyle(appliedFilter)
+                 ]} />
+               )}
+            </View>
+            
+            {/* AI overlays positioned correctly */}
+            {aiOverlays && aiOverlays.map((overlay) => (
+              <Image
+                key={overlay.id}
+                source={{ uri: overlay.imageUri }}
+                style={[
+                  styles.compositingOverlaySticker,
+                  {
+                    left: (overlay.x / width) * 1024, // Scale to composite size
+                    top: (overlay.y / height) * 1024,
+                    transform: [{ scale: overlay.scale }],
+                  },
+                ]}
+                resizeMode="contain"
+              />
+            ))}
+          </View>
+        )}
+      </View>
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -396,6 +592,12 @@ export default function ShareScreen() {
 
       {/* Media Preview - Small */}
       <View style={styles.mediaPreview}>
+        {isCompositing && (
+          <View style={styles.compositingOverlay}>
+            <Text style={styles.compositingText}>Applying edits...</Text>
+          </View>
+        )}
+        
         {mediaType === 'video' ? (
           // Video Preview
           isTestUri || videoError || !actualUri ? (
@@ -414,20 +616,46 @@ export default function ShareScreen() {
             />
           )
         ) : (
-          // Photo Preview
-          imageError ? (
-            <View style={styles.placeholderContainer}>
-              <Text style={styles.placeholderIcon}>📸</Text>
-              <Text style={styles.placeholderText}>Photo</Text>
-            </View>
-          ) : (
-            <Image 
-              source={{ uri: photoUri }} 
-              style={styles.photoThumbnail} 
-              resizeMode="cover"
-              onError={() => setImageError(true)}
-            />
-          )
+          // Photo Preview with composite image
+          <View style={styles.photoContainer}>
+            {imageError ? (
+              <View style={styles.placeholderContainer}>
+                <Text style={styles.placeholderIcon}>📸</Text>
+                <Text style={styles.placeholderText}>Photo</Text>
+              </View>
+            ) : (
+              <Image 
+                source={{ uri: compositedImageUri || filteredImageUri || photoUri }} 
+                style={styles.photoThumbnail} 
+                resizeMode="cover"
+                onError={() => setImageError(true)}
+              />
+            )}
+            
+            {/* Show AI overlays on top of photo */}
+            {aiOverlays && aiOverlays.length > 0 && aiOverlays.map((overlay) => (
+              <Image
+                key={overlay.id}
+                source={{ uri: overlay.imageUri }}
+                style={[
+                  styles.overlaySticker,
+                  {
+                    left: overlay.x * 0.3, // Scale down for preview
+                    top: overlay.y * 0.3,
+                    transform: [{ scale: overlay.scale * 0.3 }],
+                  },
+                ]}
+                resizeMode="contain"
+              />
+            ))}
+            
+            {/* Show filter indicator */}
+            {appliedFilter && (
+              <View style={styles.filterIndicator}>
+                <Text style={styles.filterText}>{appliedFilter.name}</Text>
+              </View>
+            )}
+          </View>
         )}
         
         {/* Caption Display */}
@@ -474,12 +702,20 @@ export default function ShareScreen() {
           {/* Your Story Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>📖 Your Story</Text>
-            <TouchableOpacity style={styles.storyOption} onPress={addToStory}>
+            <TouchableOpacity 
+              style={[styles.storyOption, (isCompositing || isPosting) && styles.storyOptionDisabled]} 
+              onPress={addToStory}
+              disabled={isCompositing || isPosting}
+            >
               <View style={styles.storyIconContainer}>
-                <Text style={styles.storyIcon}>➕</Text>
+                <Text style={styles.storyIcon}>
+                  {isCompositing ? '⏳' : isPosting ? '📤' : '➕'}
+                </Text>
               </View>
               <View style={styles.storyInfo}>
-                <Text style={styles.storyTitle}>Add to My Story</Text>
+                <Text style={styles.storyTitle}>
+                  {isCompositing ? 'Creating Composite...' : isPosting ? 'Posting to Story...' : 'Add to My Story'}
+                </Text>
                 <Text style={styles.storySubtitle}>Share with all friends • 24h</Text>
               </View>
               <Text style={styles.storyArrow}>→</Text>
@@ -632,6 +868,10 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 12,
   },
+  storyOptionDisabled: {
+    opacity: 0.6,
+    backgroundColor: '#424242',
+  },
   storyIconContainer: {
     width: 45,
     height: 45,
@@ -766,5 +1006,80 @@ const styles = StyleSheet.create({
     color: '#9E9E9E',
     fontSize: 14,
     lineHeight: 20,
+  },
+  compositingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  compositingText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  photoContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  overlaySticker: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+  },
+  filterIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  filterText: {
+    color: '#FFDD3A',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  hiddenCompositingView: {
+    position: 'absolute',
+    left: -2000, // Hide off-screen
+    top: 0,
+    width: 1024,
+    height: 1024,
+  },
+  compositingContainer: {
+    width: 1024,
+    height: 1024,
+    position: 'relative',
+  },
+  compositingBaseImage: {
+    width: 1024,
+    height: 1024,
+  },
+  compositingOverlaySticker: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+  },
+  compositingImageContainer: {
+    width: 1024,
+    height: 1024,
+    position: 'relative',
+  },
+  filterOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: 1024,
+    height: 1024,
   },
 }); 

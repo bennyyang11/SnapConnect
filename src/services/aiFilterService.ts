@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { callLangChain } from './langchain';
+import * as FileSystem from 'expo-file-system';
 
 // OpenAI API key from environment variables
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || '';
@@ -7,6 +8,33 @@ const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || '';
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
+
+// Helper function to convert local file URI to base64 data URL
+const convertLocalImageToBase64 = async (imageUri: string): Promise<string> => {
+  try {
+    if (!imageUri.startsWith('file://')) {
+      // If it's already a HTTP URL, return as is
+      return imageUri;
+    }
+    
+    console.log('🔄 Converting local image to base64...');
+    
+    // Read the file as base64
+    const base64 = await FileSystem.readAsStringAsync(imageUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    
+    // Create data URL with proper MIME type
+    const dataUrl = `data:image/jpeg;base64,${base64}`;
+    
+    console.log('✅ Successfully converted to base64 (length:', base64.length, 'chars)');
+    return dataUrl;
+    
+  } catch (error) {
+    console.error('❌ Failed to convert image to base64:', error);
+    throw new Error('Could not process image file. Please try again.');
+  }
+};
 
 // Filter definitions with mood mappings
 export interface FilterDefinition {
@@ -52,13 +80,13 @@ const AI_FILTER_LIBRARY: FilterDefinition[] = [
   {
     id: 'dark_glitch',
     name: 'Dark Glitch',
-    description: 'Corrupted digital aesthetic with dark tones',
+    description: 'Dark moody aesthetic with subtle digital effects',
     mood: ['edgy', 'rebellious', 'intense', 'mysterious', 'angry'],
-    visualStyle: 'glitch',
-    intensity: 'intense',
-    colorPalette: ['#000000', '#1a1a1a', '#ff0000', '#00ff00'],
-    effects: ['glitch', 'digital_noise', 'scan_lines', 'color_shift'],
-    tags: ['cyberpunk', 'dark', 'tech', 'underground'],
+    visualStyle: 'dark',
+    intensity: 'moderate',
+    colorPalette: ['#000000', '#1a1a1a', '#333333', '#666666'],
+    effects: ['high_contrast', 'shadows', 'dark_tone', 'vignette'],
+    tags: ['cyberpunk', 'dark', 'moody', 'underground'],
     emoji: '⚡'
   },
   {
@@ -234,9 +262,15 @@ export class AIFilterService {
 
     try {
       console.log('😊 Analyzing facial expressions in image...');
+      console.log('😊 Processing image URI:', imageUri);
+      
+      // Convert local file URI to base64 if needed
+      const processedImageUri = await convertLocalImageToBase64(imageUri);
+      
+      console.log('😊 Calling OpenAI Vision API with processed URI');
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4-vision-preview',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'user',
@@ -255,7 +289,7 @@ export class AIFilterService {
               },
               {
                 type: 'image_url',
-                image_url: { url: imageUri }
+                image_url: { url: processedImageUri }
               }
             ]
           }

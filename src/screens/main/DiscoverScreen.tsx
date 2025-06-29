@@ -13,6 +13,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useAppStore } from '../../store/useAppStore';
 import DiscoverAIService, { FitnessContent } from '../../services/discoverAIService';
 import UserInteractionService from '../../services/userInteractionService';
@@ -20,6 +21,7 @@ import UserInteractionService from '../../services/userInteractionService';
 const { width } = Dimensions.get('window');
 
 export default function DiscoverScreen() {
+  const navigation = useNavigation();
   const { user } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -132,6 +134,12 @@ export default function DiscoverScreen() {
     console.log('🔍 Searching for:', query);
 
     try {
+      // Track the search query for personalization
+      await UserInteractionService.trackSearchQuery(
+        user?.id || 'demo-user',
+        query.trim()
+      );
+
       // Filter existing content first
       const filteredContent = allContent.filter(item =>
         item.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -146,33 +154,53 @@ export default function DiscoverScreen() {
       // If we have good matches, show them
       if (filteredContent.length > 0) {
         setContent(filteredContent);
+        
+        // Track search result count
+        await UserInteractionService.trackSearchQuery(
+          user?.id || 'demo-user',
+          query.trim(),
+          filteredContent.length
+        );
       } else {
-        // No matches found, try to generate AI content for the search query
-        console.log('🤖 No matches found, generating AI content for search query...');
+        // No matches found, generate multiple AI articles for the search query
+        console.log('🤖 No matches found, generating multiple AI articles for search query...');
         
-        const searchContentTypes: FitnessContent['type'][] = ['article', 'tip', 'workout_plan'];
-        const randomType = searchContentTypes[Math.floor(Math.random() * searchContentTypes.length)];
+        const searchResults = await DiscoverAIService.generateMultipleSearchResults(query, 4);
         
-        const aiContent = await DiscoverAIService.generateFitnessContent(randomType, query);
-        
-        if (aiContent) {
-          console.log('✅ Generated AI content for search:', aiContent.title);
-          setContent([aiContent]);
+        if (searchResults.length > 0) {
+          console.log(`✅ Generated ${searchResults.length} AI articles for search:`, searchResults.map(item => item.title));
+          setContent(searchResults);
           
           // Add to all content for future searches
-          setAllContent(prev => [aiContent, ...prev]);
+          setAllContent(prev => [...searchResults, ...prev]);
           
-          // Track search interaction
-          await UserInteractionService.trackInteraction(
+          // Track search result count
+          await UserInteractionService.trackSearchQuery(
             user?.id || 'demo-user',
-            aiContent.id,
-            'view',
-            aiContent,
-            { source: 'search' }
+            query.trim(),
+            searchResults.length
           );
+          
+          // Track search interactions for all generated content
+          searchResults.forEach(async (aiContent) => {
+            await UserInteractionService.trackInteraction(
+              user?.id || 'demo-user',
+              aiContent.id,
+              'view',
+              aiContent,
+              { source: 'search_generated' }
+            );
+          });
         } else {
           // Show empty state
           setContent([]);
+          
+          // Track failed search
+          await UserInteractionService.trackSearchQuery(
+            user?.id || 'demo-user',
+            query.trim(),
+            0
+          );
         }
       }
     } catch (error) {
@@ -420,12 +448,15 @@ Remember: Consistency beats perfection! Show up and do your best! 🌟`,
     try {
       const userId = user?.id || 'demo-user';
       const userProfile = UserInteractionService.getUserProfile(userId);
-      const recentInteractions = UserInteractionService.getUserInteractions(userId, 20);
-      const interactionTitles = recentInteractions.map(i => `interaction_${i.action}`);
+      
+      // Get actual content interests instead of generic interaction types
+      const userInterests = UserInteractionService.getUserContentInterests(userId, 15);
+      
+      console.log('🎯 User content interests count:', userInterests.length);
       
       const recommendations = await DiscoverAIService.generatePersonalizedRecommendations(
         userProfile.preferences,
-        interactionTitles,
+        userInterests, // Use actual content interests
         8
       );
       
@@ -490,17 +521,11 @@ Remember: Consistency beats perfection! Show up and do your best! 🌟`,
         { source: activeTab }
       );
 
-      // Show content details
-      Alert.alert(
-        `${item.thumbnailEmoji} ${item.title}`,
-        item.content,
-        [
-          { text: 'Like ❤️', onPress: () => handleAction(item, 'like') },
-          { text: 'Save 📌', onPress: () => handleAction(item, 'save') },
-          { text: 'Share 🔗', onPress: () => handleAction(item, 'share') },
-          { text: 'Close', style: 'cancel' }
-        ]
-      );
+      // Navigate to article detail screen
+      (navigation as any).navigate('ArticleDetail', {
+        article: item,
+        source: activeTab
+      });
     } catch (error) {
       console.error('❌ Error handling content press:', error);
     }

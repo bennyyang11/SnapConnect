@@ -16,6 +16,7 @@ import WorkoutSearchScreen from './src/screens/main/WorkoutSearchScreen';
 import FitnessScreen from './src/screens/fitness/FitnessScreen';
 import FitnessChatScreen from './src/screens/fitness/ChatScreen';
 import DiscoverScreen from './src/screens/main/DiscoverScreen';
+import ArticleDetailScreen from './src/screens/main/ArticleDetailScreen';
 import FriendshipMemoryScreen from './src/screens/main/FriendshipMemoryScreen';
 import SettingsScreen from './src/screens/main/SettingsScreen';
 
@@ -335,6 +336,7 @@ const DemoMainNavigator = () => (
     <MainStack.Screen name="PhotoEditor" component={PhotoEditorScreen} />
     <MainStack.Screen name="ShareScreen" component={ShareScreen} />
     <MainStack.Screen name="WorkoutSearchScreen" component={WorkoutSearchScreen} />
+    <MainStack.Screen name="ArticleDetail" component={ArticleDetailScreen} />
     <MainStack.Screen name="FriendshipMemory" component={FriendshipMemoryScreen} />
     <MainStack.Screen name="Settings" component={SettingsScreen} />
   </MainStack.Navigator>

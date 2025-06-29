@@ -25,23 +25,44 @@ export interface ContentVector {
   };
 }
 
+// Temporary flag to disable Pinecone while debugging connection issues
+const PINECONE_ENABLED = false;
+
 // 1. AI-POWERED CAPTION GENERATION
 export const generateSmartCaption = async (imageUri: string, context?: string): Promise<string> => {
   try {
-    console.log('🤖 Generating smart caption for content...');
+    console.log('🤖 generateSmartCaption: Starting caption generation...');
+    console.log('🤖 generateSmartCaption: Image URI:', imageUri);
+    console.log('🤖 generateSmartCaption: Context:', context);
     
     // Use OpenAI to analyze the image and generate a caption
     const prompt = context 
       ? `Generate a fun, engaging caption for this image. Context: ${context}`
       : 'Generate a fun, engaging caption for this image that would work well on social media';
     
+    console.log('🤖 generateSmartCaption: Using prompt:', prompt);
+    console.log('🤖 generateSmartCaption: Calling OpenAI Vision API...');
+    
     const caption = await generateCaption(imageUri, prompt);
     
-    console.log('✅ Smart caption generated:', caption);
+    console.log('✅ generateSmartCaption: Caption generated successfully:', caption);
     return caption;
   } catch (error) {
-    console.error('❌ Error generating smart caption:', error);
-    return 'Unable to generate caption';
+    console.error('❌ generateSmartCaption: Error generating smart caption:', error);
+    
+    // Check for specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('API key')) {
+        console.error('❌ generateSmartCaption: API key issue detected');
+        throw new Error('OpenAI API key not configured or invalid');
+      }
+      if (error.message.includes('image_url') || error.message.includes('Could not process image')) {
+        console.error('❌ generateSmartCaption: Image processing issue detected');
+        throw new Error('Image format not supported. Please try again.');
+      }
+    }
+    
+    throw new Error('Unable to generate caption. Please check your internet connection and try again.');
   }
 };
 
@@ -94,14 +115,17 @@ export const createContentEmbedding = async (content: {
       },
     };
     
-    // Store in Pinecone
-    const upsertResult = await upsertToPinecone([{
-      id: contentVector.id,
-      values: contentVector.vector,
-      metadata: contentVector.metadata,
-    }]);
-    
-    console.log('✅ Content embedding created and stored');
+    // Store in Pinecone (if enabled)
+    if (PINECONE_ENABLED) {
+      const upsertResult = await upsertToPinecone([{
+        id: contentVector.id,
+        values: contentVector.vector,
+        metadata: contentVector.metadata,
+      }]);
+      console.log('✅ Content embedding created and stored in Pinecone');
+    } else {
+      console.log('⚠️ Pinecone disabled - embedding created but not stored');
+    }
     return contentVector;
     
   } catch (error) {
@@ -152,18 +176,91 @@ export const searchSimilarContent = async (query: string, userId?: string, limit
 // 4. CONTENT ANALYSIS
 export const analyzeContent = async (uri: string, type: 'photo' | 'video'): Promise<ContentAnalysis> => {
   try {
-    console.log('🔍 Analyzing content...');
+    console.log('🔍 analyzeContent: Starting content analysis...');
+    console.log('🔍 analyzeContent: URI:', uri);
+    console.log('🔍 analyzeContent: Type:', type);
     
     if (type === 'photo') {
+      console.log('🔍 analyzeContent: Calling OpenAI Vision API for image analysis...');
+      
       // Use OpenAI Vision API for image analysis
       const analysis = await analyzeImage(uri, 
         'Analyze this image and provide: mood, objects, colors, and suggested tags. Format as JSON with keys: mood, objects, colors, tags'
       );
       
-      // Parse the analysis (you might need to adjust based on actual response format)
-      const parsed = JSON.parse(analysis);
+      console.log('🔍 analyzeContent: Raw analysis response:', analysis);
       
-      return {
+      // Parse the analysis (you might need to adjust based on actual response format)
+      let parsed;
+      try {
+        // Clean the response by removing markdown code blocks and extra whitespace
+        let cleanedResponse = analysis.trim();
+        
+        // Remove markdown code blocks (```json and ```)
+        cleanedResponse = cleanedResponse.replace(/^```json\s*/i, '');
+        cleanedResponse = cleanedResponse.replace(/\s*```\s*$/i, '');
+        cleanedResponse = cleanedResponse.trim();
+        
+        console.log('🔍 analyzeContent: Cleaned response for parsing:', cleanedResponse);
+        
+        parsed = JSON.parse(cleanedResponse);
+        console.log('✅ analyzeContent: Successfully parsed JSON response:', parsed);
+      } catch (parseError) {
+        console.error('❌ analyzeContent: Failed to parse JSON response:', parseError);
+        console.log('🔍 analyzeContent: Attempting to extract data from raw response...');
+        
+        // Enhanced fallback parsing that tries to extract data from the text
+        parsed = {
+          mood: 'neutral',
+          objects: [],
+          colors: [],
+          tags: []
+        };
+        
+        // Try to extract mood
+        const moodMatch = analysis.match(/"mood":\s*"([^"]+)"/i);
+        if (moodMatch) parsed.mood = moodMatch[1];
+        
+        // Try to extract objects array
+        const objectsMatch = analysis.match(/"objects":\s*\[([\s\S]*?)\]/i);
+        if (objectsMatch) {
+          try {
+            const objectsStr = '[' + objectsMatch[1] + ']';
+            const objectsArray = JSON.parse(objectsStr);
+            parsed.objects = objectsArray;
+          } catch (e) {
+            console.log('Could not parse objects array');
+          }
+        }
+        
+        // Try to extract colors array
+        const colorsMatch = analysis.match(/"colors":\s*\[([\s\S]*?)\]/i);
+        if (colorsMatch) {
+          try {
+            const colorsStr = '[' + colorsMatch[1] + ']';
+            const colorsArray = JSON.parse(colorsStr);
+            parsed.colors = colorsArray;
+          } catch (e) {
+            console.log('Could not parse colors array');
+          }
+        }
+        
+        // Try to extract tags array
+        const tagsMatch = analysis.match(/"tags":\s*\[([\s\S]*?)\]/i);
+        if (tagsMatch) {
+          try {
+            const tagsStr = '[' + tagsMatch[1] + ']';
+            const tagsArray = JSON.parse(tagsStr);
+            parsed.tags = tagsArray;
+          } catch (e) {
+            console.log('Could not parse tags array');
+          }
+        }
+        
+        console.log('🔍 analyzeContent: Fallback parsing result:', parsed);
+      }
+      
+      const result = {
         caption: '',
         tags: parsed.tags || [],
         mood: parsed.mood || 'neutral',
@@ -171,7 +268,11 @@ export const analyzeContent = async (uri: string, type: 'photo' | 'video'): Prom
         colors: parsed.colors || [],
         confidence: 0.8,
       };
+      
+      console.log('✅ analyzeContent: Final analysis result:', result);
+      return result;
     } else {
+      console.log('🔍 analyzeContent: Video analysis - using simplified approach');
       // For videos, we'll use a simplified analysis
       return {
         caption: '',
@@ -183,7 +284,19 @@ export const analyzeContent = async (uri: string, type: 'photo' | 'video'): Prom
       };
     }
   } catch (error) {
-    console.error('❌ Error analyzing content:', error);
+    console.error('❌ analyzeContent: Error analyzing content:', error);
+    
+    // Provide more specific error information
+    if (error instanceof Error) {
+      console.error('❌ analyzeContent: Error details:', error.message);
+      if (error.message.includes('API key')) {
+        console.error('❌ analyzeContent: API key configuration issue');
+      }
+      if (error.message.includes('image_url') || error.message.includes('Could not process image')) {
+        console.error('❌ analyzeContent: Image processing issue');
+      }
+    }
+    
     return {
       caption: '',
       tags: ['content'],

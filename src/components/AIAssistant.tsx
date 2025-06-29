@@ -47,16 +47,22 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       return;
     }
 
+    console.log('🤖 AIAssistant: Starting caption generation for URI:', contentUri);
+    console.log('🤖 AIAssistant: Content type:', contentType);
+
     setLoading(true);
     try {
       const caption = await generateSmartCaption(contentUri);
+      console.log('✅ AIAssistant: Caption generated successfully:', caption);
       onCaptionGenerated?.(caption);
       Alert.alert('✨ Caption Generated!', caption, [
         { text: 'Copy to Editor', onPress: () => onCaptionGenerated?.(caption) },
         { text: 'OK' }
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to generate caption');
+      console.error('❌ AIAssistant: Caption generation failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to generate caption: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -68,13 +74,21 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       return;
     }
 
+    console.log('🏷️ AIAssistant: Starting tag generation for URI:', contentUri);
+    console.log('🏷️ AIAssistant: Content type:', contentType);
+
     setLoading(true);
     try {
       // First analyze the content to get context
+      console.log('🔍 AIAssistant: Analyzing content first...');
       const analysis = await analyzeContent(contentUri, contentType);
+      console.log('✅ AIAssistant: Content analysis complete:', analysis);
+      
       const contextText = `${analysis.mood} ${analysis.objects.join(' ')} ${analysis.tags.join(' ')}`;
+      console.log('📝 AIAssistant: Generated context text:', contextText);
       
       const tags = await generateAutoTags(contextText);
+      console.log('✅ AIAssistant: Tags generated successfully:', tags);
       onTagsGenerated?.(tags);
       
       Alert.alert('🏷️ Tags Generated!', tags.join(', '), [
@@ -82,7 +96,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         { text: 'OK' }
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to generate tags');
+      console.error('❌ AIAssistant: Tag generation failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to generate tags: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -94,9 +110,13 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
       return;
     }
 
+    console.log('🔍 AIAssistant: Starting content analysis for URI:', contentUri);
+    console.log('🔍 AIAssistant: Content type:', contentType);
+
     setLoading(true);
     try {
       const analysis = await analyzeContent(contentUri, contentType);
+      console.log('✅ AIAssistant: Content analysis complete:', analysis);
       setAnalysisResult(analysis);
       
       Alert.alert(
@@ -105,7 +125,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({
         [{ text: 'OK' }]
       );
     } catch (error) {
-      Alert.alert('Error', 'Failed to analyze content');
+      console.error('❌ AIAssistant: Content analysis failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Failed to analyze content: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

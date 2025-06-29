@@ -100,10 +100,42 @@ export default function FitnessScreen() {
     
     const lowerText = text.toLowerCase();
     
+    // Enhanced exercise detection with common variations
+    const exerciseVariations: { [key: string]: string[] } = {
+      'bench press': ['bench press', 'bench', 'benching', 'bench pressed'],
+      'squats': ['squats', 'squat', 'squatting', 'squatted', 'back squat', 'front squat'],
+      'deadlift': ['deadlift', 'deadlifts', 'deadlifting', 'deadlifted', 'dl'],
+      'pull ups': ['pull ups', 'pull up', 'pullups', 'pullup', 'chin ups', 'chin up'],
+      'push ups': ['push ups', 'push up', 'pushups', 'pushup', 'press ups', 'press up'],
+      'bicep curls': ['bicep curls', 'bicep curl', 'curls', 'curl', 'arm curls'],
+      'tricep extensions': ['tricep extensions', 'tricep extension', 'triceps', 'tricep'],
+      'shoulder press': ['shoulder press', 'shoulder pressed', 'overhead press', 'military press'],
+      'lateral raises': ['lateral raises', 'lateral raise', 'side raises', 'side raise'],
+      'rows': ['rows', 'row', 'rowing', 'rowed', 'barbell rows', 'dumbbell rows'],
+      'dips': ['dips', 'dip', 'dipping', 'dipped'],
+      'lunges': ['lunges', 'lunge', 'lunging', 'lunged'],
+      'leg press': ['leg press', 'leg pressed', 'leg pressing'],
+      'leg curls': ['leg curls', 'leg curl', 'hamstring curls', 'hamstring curl'],
+      'leg extensions': ['leg extensions', 'leg extension', 'quad extensions'],
+      'calf raises': ['calf raises', 'calf raise', 'calves', 'calf'],
+      'crunches': ['crunches', 'crunch', 'crunching'],
+      'planks': ['planks', 'plank', 'planking'],
+    };
+
+    // Check each exercise and its variations
     Object.keys(EXERCISE_MUSCLE_MAP).forEach(exercise => {
-      if (lowerText.includes(exercise)) {
+      const variations = exerciseVariations[exercise] || [exercise];
+      
+      const found = variations.some(variation => {
+        // Check for whole word matches to avoid false positives
+        const regex = new RegExp(`\\b${variation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+        return regex.test(lowerText);
+      });
+      
+      if (found) {
         exercises.push(exercise);
         muscles.push(...EXERCISE_MUSCLE_MAP[exercise]);
+        console.log(`🏋️ Detected exercise: ${exercise} → muscles: ${EXERCISE_MUSCLE_MAP[exercise].join(', ')}`);
       }
     });
     

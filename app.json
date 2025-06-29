@@ -17,6 +17,9 @@
       "bundleIdentifier": "com.bennyyang.snapconnect",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
       }
     },
     "android": {
@@ -24,7 +27,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.bennyyang.snapconnect"
     },
     "web": {
       "favicon": "./assets/favicon.png"
